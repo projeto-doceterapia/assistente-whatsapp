@@ -25,6 +25,17 @@ docker run --rm -v "$PWD:/app" -w /app python:3.12.7-slim \
 `pytest-asyncio` is required because the core client and the Redis state layer
 are async (the service runs its workers as asyncio tasks).
 
+The Redis state tests need a real Redis. Point `REDIS_TEST_URL` at one; they
+skip cleanly when it is unset:
+
+```sh
+docker run -d --name redis-test -p 127.0.0.1::6379 redis:7
+PORT=$(docker port redis-test 6379 | cut -d: -f2)
+docker run --rm -e REDIS_TEST_URL="redis://host.docker.internal:$PORT/0" \
+  --add-host=host.docker.internal:host-gateway -v "$PWD:/app" -w /app \
+  python:3.12.7-slim sh -c "pip install -r requirements-dev.txt && python -m pytest -q"
+```
+
 ## Build the image
 
 ```sh
