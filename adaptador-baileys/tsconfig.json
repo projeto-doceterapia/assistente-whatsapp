@@ -18,6 +18,5 @@
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts", "src/fakeSocket.ts"]
+  "include": ["src/**/*.ts"]
 }
