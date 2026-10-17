@@ -76,3 +76,20 @@ the image.
 Only `BENEFICIARIA_TELEFONE`, `CORE_BASE_URL` and `REDIS_URL` are required for the
 service to start. Channel and LLM credentials are read lazily by the components
 that use them, so `/health` works without them.
+
+## LLM provider (purchase extraction)
+
+The purchase flow extracts items with an LLM behind `LlmPort`. The
+first provider is Gemini, using the official `google-genai` SDK. It is selected
+and configured through these variables; tests use a fake provider that replays
+recorded responses and never call the network.
+
+| Variable | Required | Default | Used by |
+|---|---|---|---|
+| `LLM_PROVIDER` | no | `gemini` | provider selection |
+| `GEMINI_API_KEY` | yes (Gemini) | — | Gemini API key |
+| `GEMINI_MODEL` | yes (Gemini) | — | Gemini model id (e.g. `gemini-2.0-flash`) |
+
+The catalog search loop is capped by two settings passed to `ExtracaoService`:
+`rodadas-busca` (default 1) and the per-search candidate limit
+(default 200).
