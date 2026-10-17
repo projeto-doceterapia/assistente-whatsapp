@@ -4,3 +4,4 @@ httpx==0.28.1
 redis==8.1.0
 uvicorn==0.54.0
 google-genai==2.31.0
+zxing-cpp==3.1.1
