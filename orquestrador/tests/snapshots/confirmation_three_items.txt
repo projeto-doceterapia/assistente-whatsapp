@@ -1,0 +1,6 @@
+Entendi esta compra:
+✔ Arroz: 2 × 5 kg = 10 kg
+✔ Feijão: 3 kg
+⚠ Farinha de mandioca (1 kg) — não está no seu cadastro, incluir em Farinhas
+
+Posso incluir o item novo e registrar? Responda 'sim' ou me diga o que corrigir.

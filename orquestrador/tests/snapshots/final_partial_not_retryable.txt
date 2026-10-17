@@ -1,0 +1,9 @@
+Registrei estes itens:
+✔ Arroz: 10 kg
+✔ Feijão: 3 kg
+✔ Açúcar: 5 kg
+
+Não consegui registrar:
+⚠ Item inválido: não passou na validação
+
+Esses itens não dá pra repetir automaticamente. Pode me enviar de novo como uma nova compra.

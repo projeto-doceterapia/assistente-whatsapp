@@ -7,6 +7,7 @@ dependencies = [
     "fastapi==0.151.0",
     "pydantic==2.14.1",
     "httpx==0.28.1",
+    "pillow==13.0.0",
     "redis==8.1.0",
     "uvicorn==0.54.0",
     "google-genai==2.31.0",
