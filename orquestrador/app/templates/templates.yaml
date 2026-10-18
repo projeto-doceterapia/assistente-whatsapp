@@ -1,0 +1,109 @@
+# Single source of notification texts.
+#
+# Each template renders the SAME data in two shapes:
+#   text  -> multi-line free text sent by the Baileys channel
+#   parts -> ordered, newline-free fragments used as Cloud API template body
+#            parameters ({{1}}, {{2}}, ...); list-shaped data is joined inline
+#            because Cloud API template parameters cannot contain line breaks.
+#
+# Placeholders use Python str.format fields taken from the notification
+# `parametros`. A `sections` entry marks a list-shaped parameter: an empty list
+# renders the PT-BR text "nada pendente" for that section. `cloud_name` is the
+# approved Meta template name; `cloud_lang` its language code.
+
+resumo_inicio_dia:
+  cloud_name: resumo_inicio_dia
+  cloud_lang: pt_BR
+  sections:
+    - sinais_pendentes
+    - pagamentos_finais
+    - entregas_hoje
+    - pedidos_atrasados
+  text: |-
+    *Resumo do início do dia ({data})*
+
+    💰 Sinais a conferir:
+    {sinais_pendentes}
+
+    🧾 Pagamentos finais a conferir:
+    {pagamentos_finais}
+
+    📦 Entregas de hoje:
+    {entregas_hoje}
+
+    ⏰ Pedidos atrasados:
+    {pedidos_atrasados}
+  parts:
+    - "Resumo do início do dia ({data})"
+    - "Sinais a conferir: {sinais_pendentes}"
+    - "Pagamentos finais a conferir: {pagamentos_finais}"
+    - "Entregas de hoje: {entregas_hoje}"
+    - "Pedidos atrasados: {pedidos_atrasados}"
+
+resumo_fim_dia:
+  cloud_name: resumo_fim_dia
+  cloud_lang: pt_BR
+  sections:
+    - pedidos_proximos
+    - aguardando_sinal
+    - insumos_comprar
+  text: |-
+    *Resumo do fim do dia ({data})*
+
+    👩‍🍳 Pedidos a produzir nos próximos dias:
+    {pedidos_proximos}
+
+    💰 Aguardando sinal:
+    {aguardando_sinal}
+
+    🛒 Insumos a comprar:
+    {insumos_comprar}
+  parts:
+    - "Resumo do fim do dia ({data})"
+    - "Pedidos a produzir nos próximos dias: {pedidos_proximos}"
+    - "Aguardando sinal: {aguardando_sinal}"
+    - "Insumos a comprar: {insumos_comprar}"
+
+estoque_baixo:
+  cloud_name: estoque_baixo
+  cloud_lang: pt_BR
+  text: |-
+    ⚠️ *Estoque baixo*
+
+    O insumo *{insumo}* está em {saldo} (mínimo {minimo}).
+    Vale repor.
+  parts:
+    - "Estoque baixo: {insumo} está em {saldo} (mínimo {minimo})"
+
+dia_lotado:
+  cloud_name: dia_lotado
+  cloud_lang: pt_BR
+  text: |-
+    📅 *Dia lotado*
+
+    O dia {data} atingiu o limite da agenda com {pedidos} pedidos.
+  parts:
+    - "Dia lotado: {data} atingiu o limite com {pedidos} pedidos"
+
+compra_registrada:
+  cloud_name: compra_registrada
+  cloud_lang: pt_BR
+  sections:
+    - itens
+  text: |-
+    ✅ *Compra registrada*
+
+    Itens lançados no estoque:
+    {itens}
+  parts:
+    - "Compra registrada. Itens lançados: {itens}"
+
+alerta_operacional:
+  cloud_name: alerta_operacional
+  cloud_lang: pt_BR
+  text: |-
+    🚨 *Alerta operacional*
+
+    {mensagem}
+  parts:
+    - "Alerta operacional: {mensagem}"

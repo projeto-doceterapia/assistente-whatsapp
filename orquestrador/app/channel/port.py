@@ -40,6 +40,20 @@ class MediaNotFoundError(ChannelError):
         self.media_ref = media_ref
 
 
+class MediaTooLargeError(ChannelError):
+    """The downloaded media exceeds the configured byte cap.
+
+    Raised as soon as the limit is known to be exceeded (a Content-Length above
+    the cap, or the streamed bytes crossing it), so an oversized body is never
+    fully buffered in memory.
+    """
+
+    def __init__(self, media_ref: str, max_bytes: int) -> None:
+        super().__init__("media exceeds the maximum allowed size")
+        self.media_ref = media_ref
+        self.max_bytes = max_bytes
+
+
 @runtime_checkable
 class ChannelPort(Protocol):
     """The port every channel (fake, Baileys, Cloud API) implements identically."""
