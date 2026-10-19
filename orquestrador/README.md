@@ -252,3 +252,16 @@ backoff schedule is deterministic in tests.
 | `RETRY_CAP_S` | no | `300` | no | backoff ceiling (seconds) |
 | `RETRY_MAX_TENTATIVAS` | no | `6` | no | attempts per item before the DLQ |
 | `RETRY_REQUEST_WINDOW_H` | no | `24` | no | on-request 'try again' window (hours) |
+
+## Scripted LLM provider (offline tests)
+
+For integration and end-to-end runs without a real key or the network, set
+`LLM_PROVIDER=scripted`. The provider then replays recorded JSON responses
+from the file named by `FAKE_LLM_FIXTURES` (keyed by schema name and request
+text; see `app/llm/scripted.py`). It is never used by the Gemini production
+path.
+
+| Variable | Required | Default | Secret | Used by |
+|---|---|---|---|---|
+| `LLM_PROVIDER` | no | `gemini` | no | set to `scripted` to replay recorded responses |
+| `FAKE_LLM_FIXTURES` | scripted | — | no | path to the scripted fixtures JSON file |

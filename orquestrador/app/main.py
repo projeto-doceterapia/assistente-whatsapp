@@ -36,8 +36,8 @@ from app.flow.handler import InboundHandler
 from app.flow.intent import LlmClassifier
 from app.flow.models import FlowDeps
 from app.flow.webhook import webhook_router
-from app.llm.gemini import GeminiProvider
-from app.llm.port import GeminiSettings, LlmConfigError
+from app.llm.factory import build_llm_provider
+from app.llm.port import LlmConfigError
 from app.logging import configure_logging
 from app.ops import (
     CategoriasProvider,
@@ -264,7 +264,7 @@ def _build_handler(
     purchases: PurchaseNotifier,
     monitor: HealthMonitor,
 ) -> InboundHandler:
-    llm = GeminiProvider(GeminiSettings.from_env())
+    llm = build_llm_provider()
     categorias = CategoriasProvider(core, ttl_s=_ops_categorias_ttl())
 
     deps = FlowDeps(
