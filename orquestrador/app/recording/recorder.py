@@ -7,14 +7,17 @@ movement, because the idempotency key needs the supply id. The key is
 `fluxo:{fluxoId}:{insumoId}`. Every item's isolated status is
 written to Redis, so a restart can tell done from pending.
 
-The automatic retry worker is a separate seam; here `RetrySink` is only that
-seam. The default is a no-op, so retryable items are reported to the owner with
-the retry offer and nothing is enqueued yet.
+The automatic retry worker is wired through `RetrySink`: each
+retryable item is handed to the sink as a `RetryEnqueue`, carrying the draft so
+the worker can replay the exact recording path with the same key. The default
+sink is a no-op, so without the worker the retryable items are only reported to
+the owner with the retry offer.
 """
 
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 
 from app.core.errors import CoreError, CoreNotFoundError, CoreTransientError
 from app.core.models import (
@@ -24,14 +27,28 @@ from app.core.models import (
 from app.flow.models import Draft, DraftItem
 from app.flow.ports import StatePort
 from app.llm.schemas import AcaoItem
-from app.recording.models import ItemResult, ItemStatus, RecordingResult
+from app.recording.models import FailureKind, ItemResult, ItemStatus, RecordingResult
+
+
+@dataclass(frozen=True)
+class RetryEnqueue:
+    """What the recorder hands the retry seam for one retryable item.
+
+    It carries the item outcome plus the draft and the single draft item, so the
+    retry worker can replay the exact recording path and reuse the deterministic
+    idempotency key."""
+
+    result: ItemResult
+    draft: Draft
+    item: DraftItem
+
 
 # A retryable item is handed to this sink for the retry worker.
-RetrySink = Callable[[ItemResult], Awaitable[None]]
+RetrySink = Callable[[RetryEnqueue], Awaitable[None]]
 
 
-async def no_op_retry_sink(_item: ItemResult) -> None:
-    """Default sink: the retry worker does not exist yet."""
+async def no_op_retry_sink(_enqueue: RetryEnqueue) -> None:
+    """Default sink: the retry worker is not wired (opt-in)."""
 
 
 def _item_key(index: int) -> str:
@@ -64,7 +81,7 @@ class Recorder:
             resultado = await self._record_item(draft, item)
             await self._persist(draft.fluxo_id, resultado)
             if resultado.retryable:
-                await self._retry_sink(resultado)
+                await self._retry_sink(RetryEnqueue(result=resultado, draft=draft, item=item))
             resultados.append(resultado)
         return RecordingResult(itens=resultados)
 
@@ -131,6 +148,7 @@ class Recorder:
         # validation and conflicts are definitive.
         retryable = isinstance(exc, (CoreTransientError, CoreNotFoundError))
         status = ItemStatus.RETRYABLE if retryable else ItemStatus.FAILED
+        falha = _failure_kind(exc) if retryable else None
         resolved_key = key or (
             idempotency_key(draft, insumo_id) if insumo_id is not None else ""
         )
@@ -142,6 +160,7 @@ class Recorder:
             insumo_id=insumo_id,
             idempotency_key=resolved_key,
             motivo=_motivo(exc, retryable),
+            falha=falha,
         )
 
     async def _persist(self, fluxo_id: str, resultado: ItemResult) -> None:
@@ -151,6 +170,14 @@ class Recorder:
 
 
 def _motivo(exc: CoreError, retryable: bool) -> str:
-    if retryable:
-        return "o sistema estava fora do ar"
-    return "não passou na validação"
+    if not retryable:
+        return "não passou na validação"
+    if isinstance(exc, CoreNotFoundError):
+        return "o insumo não está disponível"
+    return "o sistema estava fora do ar"
+
+
+def _failure_kind(exc: CoreError) -> FailureKind:
+    if isinstance(exc, CoreNotFoundError):
+        return FailureKind.SUPPLY_MISSING
+    return FailureKind.TRANSIENT

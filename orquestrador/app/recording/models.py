@@ -26,11 +26,25 @@ class ItemStatus(str, Enum):
     FAILED = "FAILED"
 
 
+class FailureKind(str, Enum):
+    """The kind of a retryable failure, so the retry worker knows on-request
+    eligibility: a missing/inactive supply is eligible even before the
+    automatic attempts are exhausted.
+
+    TRANSIENT       -> timeout, 5xx, network: the core was unavailable.
+    SUPPLY_MISSING  -> 404: the supply was missing or inactive.
+    """
+
+    TRANSIENT = "TRANSIENT"
+    SUPPLY_MISSING = "SUPPLY_MISSING"
+
+
 class ItemResult(BaseModel):
     """Outcome of recording one draft item.
 
     `idempotency_key` is the key used, kept so a retry reuses it exactly.
-    `motivo` is the PT-BR reason shown to the owner on failure.
+    `motivo` is the PT-BR reason shown to the owner on failure. `falha` is the
+    retryable-failure kind, set only when `status` is RETRYABLE.
     """
 
     index: int
@@ -41,6 +55,7 @@ class ItemResult(BaseModel):
     idempotency_key: str
     tentativas: int = 1
     motivo: str | None = None
+    falha: FailureKind | None = None
 
     @property
     def ok(self) -> bool:

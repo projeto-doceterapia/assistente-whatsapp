@@ -43,17 +43,20 @@ from app.messages import (
     third_adjustment,
     unsupported_type,
 )
-from app.recording import Recorder, RetrySink, final_message, no_op_retry_sink
+from app.recording import Recorder, final_message, no_op_retry_sink
+from app.retry import RetryCoordinator, RetryRequestResult
 
 _FIELD_ESTADO = "estado"
 _FIELD_DRAFT = "draft"
 
-# A text reply while awaiting confirmation maps to a machine event by intent.
+# A text reply while awaiting confirmation maps to a machine event by intent. A
+# standalone "try again" there is out of context (the retry flow runs in NO_FLOW).
 _INTENT_TO_EVENT = {
     ReplyIntent.CONFIRM: EventKind.CONFIRM,
     ReplyIntent.ADJUST: EventKind.ADJUST,
     ReplyIntent.CANCEL: EventKind.CANCEL,
     ReplyIntent.NEW_PURCHASE: EventKind.NEW_PURCHASE,
+    ReplyIntent.RETRY: EventKind.OUT_OF_CONTEXT,
     ReplyIntent.OTHER: EventKind.OUT_OF_CONTEXT,
 }
 
@@ -61,12 +64,16 @@ _INTENT_TO_EVENT = {
 class InboundHandler:
     """Runs one inbound message end to end."""
 
-    def __init__(self, deps: FlowDeps, retry_sink: RetrySink = no_op_retry_sink) -> None:
+    def __init__(
+        self, deps: FlowDeps, retry_coordinator: RetryCoordinator | None = None
+    ) -> None:
         self._deps = deps
         self._extraction = ExtractionStep(deps)
         self._confirmation = ConfirmationStep(deps)
         self._adjustment = AdjustmentStep(deps)
-        self._recorder = Recorder(deps.state, deps.core, retry_sink)
+        self._retry = retry_coordinator
+        sink = retry_coordinator.enqueue if retry_coordinator else no_op_retry_sink
+        self._recorder = Recorder(deps.state, deps.core, sink)
 
     async def handle(self, message: InboundMessage) -> None:
         if message.sender != self._deps.beneficiaria:
@@ -84,6 +91,8 @@ class InboundHandler:
 
     async def _process(self, message: InboundMessage) -> None:
         estado, draft = await self._load(message.sender)
+        if estado is State.NO_FLOW and await self._handle_retry_offer(message):
+            return
         ctx = ConversationContext(
             adjustments_done=draft.ajustes if draft else 0,
             max_adjustments=self._deps.max_ajustes,
@@ -110,6 +119,32 @@ class InboundHandler:
             return Event(EventKind.OUT_OF_CONTEXT)
         intent = await self._deps.classifier.classify(message.text)
         return Event(_INTENT_TO_EVENT[intent])
+
+    async def _handle_retry_offer(self, message: InboundMessage) -> bool:
+        """When a retry offer is live for this sender, a text
+        'tenta de novo' requeues the failed items; any other message drops the
+        offer and falls through to normal handling. Returns True when it fully
+        answered the message. Only an active/expired offer triggers a classify
+        call, so the normal new-purchase path is unchanged."""
+        if self._retry is None:
+            return False
+        status = await self._retry.request_status(message.sender)
+        if status == "NONE":
+            return False
+        if message.kind is not MessageKind.TEXT or not message.text:
+            await self._retry.drop_request(message.sender)
+            return False
+        intent = await self._deps.classifier.classify(message.text)
+        if intent is not ReplyIntent.RETRY:
+            # A new purchase (or anything else) drops the offer and proceeds.
+            await self._retry.drop_request(message.sender)
+            return False
+        outcome = await self._retry.request_retry(message.sender)
+        if outcome.result is RetryRequestResult.NONE:
+            return False
+        if outcome.message is not None:
+            await self._reply(message.sender, outcome.message)
+        return True
 
     # --- action execution --------------------------------------------------
 
@@ -187,8 +222,22 @@ class InboundHandler:
             return
         await self._reply(sender, recording_wait())
         result = await self._recorder.record(draft)
-        await self._reply(sender, final_message(result))
-        await self._deps.state.clear_conversation(sender)
+        # With the retry worker wired, retryable items are enqueued and the final
+        # message is sent by the worker when the last one resolves (task 10.2).
+        # Without it, finalize returns the message to send right away.
+        final = (
+            await self._retry.finalize(draft, result)
+            if self._retry is not None
+            else final_message(result)
+        )
+        if final is not None:
+            await self._reply(sender, final)
+            await self._deps.state.clear_conversation(sender)
+            return
+        # Deferred: items are still being retried. Hold the conversation in
+        # RECORDING so a stray message gets the "still recording" reply; the
+        # worker clears it when it sends the final result.
+        await self._save(sender, State.RECORDING, draft)
 
     async def _finish_confirmation(
         self, sender: str, outcome: ConfirmationOutcome

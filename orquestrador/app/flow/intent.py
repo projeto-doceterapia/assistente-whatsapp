@@ -21,6 +21,7 @@ class ReplyIntent(str, Enum):
     ADJUST = "ADJUST"
     CANCEL = "CANCEL"
     NEW_PURCHASE = "NEW_PURCHASE"
+    RETRY = "RETRY"
     OTHER = "OTHER"
 
 
@@ -29,9 +30,10 @@ _FROM_LLM: dict[TipoIntencao, ReplyIntent] = {
     TipoIntencao.AJUSTAR: ReplyIntent.ADJUST,
     TipoIntencao.CANCELAR: ReplyIntent.CANCEL,
     TipoIntencao.NOVA_COMPRA: ReplyIntent.NEW_PURCHASE,
-    # A standalone "try again" has no meaning while confirming a draft (the
-    # retry flow is task 10.3), so it reads as an unrelated reply here.
-    TipoIntencao.TENTAR_NOVAMENTE: ReplyIntent.OTHER,
+    # 'Tentar de novo' drives the on-request retry. While a
+    # draft is still awaiting confirmation it has no meaning, so the handler only
+    # acts on it when a retry window is open.
+    TipoIntencao.TENTAR_NOVAMENTE: ReplyIntent.RETRY,
     TipoIntencao.OUTRO: ReplyIntent.OTHER,
 }
 

@@ -160,3 +160,46 @@ when none is wired, alerting is disabled.
 | `DELIVERY_CONFIRM_CAP_S` | no | `60` | no | confirmation retry backoff cap (seconds) |
 | `DELIVERY_CONFIRM_MAX_TENTATIVAS` | no | `6` | no | confirmation retry attempts per poll |
 | `DELIVERY_CLAIM_TTL_S` | no | `120` | no | how long a send claim without a channel message id is tolerated before recovery treats it as 'send outcome unknown' (seconds) |
+
+## Item recording retry
+
+The `app/retry` package retries purchase items that failed transiently and drives
+the final result message. After confirmation, each item is recorded on its own; a transient
+failure (timeout, 5xx) or a missing/inactive supply (404) is enqueued in the
+Redis sorted set `retry:queue`, scored by its next-attempt time. A single
+background `RetryWorker` polls the set and replays each due item **with the same
+idempotency key** (`nota:{chave}:{insumoId}` or `fluxo:{fluxoId}:{insumoId}`), so
+a replay never duplicates. The backoff is exponential with **full jitter**
+(`base * factor ** (attempt-1)`, capped), and processing is single-flight per
+item (an NX claim on `retry:claim:{member}`), so two workers never resend the
+same item. Everything lives in Redis, so a process kill and restart resumes the
+schedule and records pending items exactly once.
+
+When an item's attempts are exhausted it goes to the DLQ (`dlq:items`), an
+operational alert is raised, and the item is marked eligible for an on-request
+retry. When the last retryable item of a purchase resolves, the worker sends one
+final result message (success / partial / failure, summary first) and clears the
+conversation. The per-purchase pending counter is decremented in a single
+server-side step, so a crashed or duplicated completion is a no-op and the final
+result message can never be sent twice.
+
+On-request retry: after a final result with retryable failures, the bot
+offers "tenta de novo". For a configurable window (default 24 h) a
+`TENTAR_NOVAMENTE` intent replays **only** the eligible items — those whose
+automatic retries were exhausted, or that failed because the supply was missing
+or inactive — with the same keys, and reports a fresh result. A new purchase or
+the window's expiry drops the offer.
+
+`main` wires the worker through `create_retry_worker(...)` / a `RetryCoordinator`
+(the recorder's retry sink) and drives its lifecycle with `await worker.start()`
+/ `await worker.stop()`. A `Clock` and a `RandomSource` are injected, so the
+backoff schedule is deterministic in tests.
+
+| Variable | Required | Default | Secret | Used by |
+|---|---|---|---|---|
+| `RETRY_POLL_INTERVAL_S` | no | `5` | no | retry queue poll interval (seconds) |
+| `RETRY_BASE_S` | no | `2` | no | backoff base (seconds) |
+| `RETRY_FACTOR` | no | `2` | no | backoff growth factor |
+| `RETRY_CAP_S` | no | `300` | no | backoff ceiling (seconds) |
+| `RETRY_MAX_TENTATIVAS` | no | `6` | no | attempts per item before the DLQ |
+| `RETRY_REQUEST_WINDOW_H` | no | `24` | no | on-request 'try again' window (hours) |

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.messages.catalog import (
     final_failure,
+    final_failure_retryable,
     final_partial,
     final_success,
     help_text,
@@ -12,6 +13,7 @@ from app.messages.catalog import (
     reading_ack,
     recording_wait,
     render_confirmation,
+    retry_started,
     retry_window_expired,
     third_adjustment,
     unsupported_type,
@@ -25,6 +27,7 @@ from app.messages.types import (
 
 __all__ = [
     "final_failure",
+    "final_failure_retryable",
     "final_partial",
     "final_success",
     "help_text",
@@ -35,6 +38,7 @@ __all__ = [
     "reading_ack",
     "recording_wait",
     "render_confirmation",
+    "retry_started",
     "retry_window_expired",
     "third_adjustment",
     "unsupported_type",

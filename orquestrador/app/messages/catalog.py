@@ -115,6 +115,17 @@ def final_failure() -> str:
     )
 
 
+def final_failure_retryable(failed: Sequence[FailedItem]) -> str:
+    """Falha total com itens que ainda dá pra repetir: list them and offer the
+    on-request retry."""
+    falhas = "\n".join(f"{_MARK_NEW} {item.nome}: {item.motivo}" for item in failed)
+    return (
+        "Não consegui registrar agora. Seus dados não foram alterados.\n"
+        f"{falhas}\n\n"
+        "Quer que eu tente de novo? É só responder 'tenta de novo'."
+    )
+
+
 def _recorded_line(item: RecordedItem) -> str:
     if item.calculo:
         return f"{item.nome}: {item.calculo}"
@@ -156,6 +167,11 @@ def retry_window_expired() -> str:
         "Os itens pendentes já expiraram. Se ainda quiser registrar, "
         "me envie a foto da nota ou escreva a compra de novo."
     )
+
+
+def retry_started() -> str:
+    """Pedido de 'tentar de novo' aceito: a nova tentativa começou."""
+    return "Beleza! Vou tentar registrar de novo os itens que faltaram, um instante…"
 
 
 def help_text() -> str:
