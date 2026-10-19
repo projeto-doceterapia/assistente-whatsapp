@@ -120,3 +120,43 @@ and never call the network.
 The catalog search loop is capped by two settings passed to `ExtracaoService`:
 `rodadas-busca` (default 1) and the per-search candidate limit
 (default 200).
+
+## Notification delivery
+
+The `app/delivery` package delivers the core's pending notifications to the
+owner on WhatsApp. A
+single background worker polls `GET /notificacoes/agenda`, picks one random send
+time inside each notification's window the first time it is seen (persisted in
+Redis, so a restart keeps it), sends through the `ChannelPort` exactly once
+(NX-guarded on `notif:{id}:sent` so two instances never double-send), and
+confirms the outcome to `POST /notificacoes/{id}/confirmacao-envio` with
+exponential backoff. If the core is unavailable during confirmation, the sent
+state is kept so the next poll confirms without resending. When a window closes
+before the notification was sent, it is reported as `FALHA` and an operational
+alert is raised. Immediate alerts use a short window, so with the default 30 s
+poll they reach WhatsApp in about one minute.
+
+The send guard is stamped with the claim time and, once the channel returns a
+message id, that id is stored under the claim with a compare-and-set, so the
+claim and the id stay consistent. If the service crashes between claiming and
+recording the id, a fresh worker treats the claim as 'send outcome unknown' once
+it is older than `DELIVERY_CLAIM_TTL_S`: it reports `FALHA` and raises an
+operational alert instead of risking a duplicate delivery with a resend. Within
+that TTL a send may still be in flight, so the worker waits and re-checks on a
+later poll. Delivery is therefore at-most-once.
+
+`main` wires the worker through `create_delivery_worker(...)` (explicit
+dependencies) and drives its lifecycle with `await worker.start()` /
+`await worker.stop()`. A `Clock` and a `RandomSource` are injected, so tests are
+deterministic. Operational alerts go through an injected `AlertRaiser` port;
+when none is wired, alerting is disabled.
+
+| Variable | Required | Default | Secret | Used by |
+|---|---|---|---|---|
+| `DELIVERY_POLL_INTERVAL_S` | no | `30` | no | agenda poll interval (seconds) |
+| `DELIVERY_AGENDA_HORIZON_MIN` | no | `60` | no | how far ahead of now the agenda range extends (minutes) |
+| `DELIVERY_AGENDA_LOOKBACK_MIN` | no | `60` | no | how far back the agenda range reaches, so windows opened while down are still delivered (minutes) |
+| `DELIVERY_CONFIRM_BASE_S` | no | `2` | no | confirmation retry base backoff (seconds) |
+| `DELIVERY_CONFIRM_CAP_S` | no | `60` | no | confirmation retry backoff cap (seconds) |
+| `DELIVERY_CONFIRM_MAX_TENTATIVAS` | no | `6` | no | confirmation retry attempts per poll |
+| `DELIVERY_CLAIM_TTL_S` | no | `120` | no | how long a send claim without a channel message id is tolerated before recovery treats it as 'send outcome unknown' (seconds) |
