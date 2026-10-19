@@ -15,10 +15,12 @@ from app.core.errors import (
 from app.core.models import (
     AgendaItem,
     CatalogoPagina,
+    CategoriaInsumo,
     ConfirmacaoEnvioRequest,
     MovimentoRequest,
     MovimentoResultado,
     NotaFiscalStatus,
+    NotificacaoRequest,
     ObterOuCriarRequest,
     ObterOuCriarResultado,
 )
@@ -117,5 +119,24 @@ class CoreClient:
             "POST",
             f"/notificacoes/{notification_id}/confirmacao-envio",
             json=request.model_dump(mode="json", exclude_none=True),
+        )
+        self._raise_for_error(response)
+
+    async def listar_categorias(self) -> list[CategoriaInsumo]:
+        """Read the supply categories (GET /categorias-insumo). The flow uses
+        them to classify new supplies; the ops layer caches the
+        result with a short TTL so the catalog classification does not hit the
+        core on every message."""
+        response = await self._request("GET", "/categorias-insumo")
+        self._raise_for_error(response)
+        return [CategoriaInsumo.model_validate(item) for item in response.json()]
+
+    async def criar_notificacao(self, request: NotificacaoRequest) -> None:
+        """Create an in-app notification (POST /notificacoes). Used for the
+        COMPRA_REGISTRADA record and the ALERTA_OPERACIONAL copy;
+        the core defaults the status to NAO_ENVIAR, so these are in-app only
+        unless the core schedules them."""
+        response = await self._request(
+            "POST", "/notificacoes", json=request.model_dump(exclude_none=True)
         )
         self._raise_for_error(response)

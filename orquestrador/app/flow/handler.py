@@ -43,7 +43,9 @@ from app.messages import (
     third_adjustment,
     unsupported_type,
 )
+from app.ops import HealthMonitor, PurchaseNotifier
 from app.recording import Recorder, final_message, no_op_retry_sink
+from app.recording.models import FailureKind, RecordingResult
 from app.retry import RetryCoordinator, RetryRequestResult
 
 _FIELD_ESTADO = "estado"
@@ -65,13 +67,19 @@ class InboundHandler:
     """Runs one inbound message end to end."""
 
     def __init__(
-        self, deps: FlowDeps, retry_coordinator: RetryCoordinator | None = None
+        self,
+        deps: FlowDeps,
+        retry_coordinator: RetryCoordinator | None = None,
+        purchases: PurchaseNotifier | None = None,
+        monitor: HealthMonitor | None = None,
     ) -> None:
         self._deps = deps
         self._extraction = ExtractionStep(deps)
         self._confirmation = ConfirmationStep(deps)
         self._adjustment = AdjustmentStep(deps)
         self._retry = retry_coordinator
+        self._purchases = purchases
+        self._monitor = monitor
         sink = retry_coordinator.enqueue if retry_coordinator else no_op_retry_sink
         self._recorder = Recorder(deps.state, deps.core, sink)
 
@@ -183,11 +191,15 @@ class InboundHandler:
             return
 
         if not draft.itens:
-            # Nothing understood: treat a loose reply as "nothing pending".
+            # Nothing understood: treat a loose reply as "nothing pending". An
+            # empty reading is the AI-failure signal the health monitor counts
+            # (task 13.1); the owner-facing reply is unchanged.
+            await self._feed_ai_health(ok=False)
             await self._reply(sender, nothing_pending())
             await self._deps.state.clear_conversation(sender)
             return
 
+        await self._feed_ai_health(ok=True)
         await self._reply(sender, reading_ack())
         outcome = await self._confirmation.build(draft)
         await self._finish_confirmation(sender, outcome)
@@ -222,8 +234,13 @@ class InboundHandler:
             return
         await self._reply(sender, recording_wait())
         result = await self._recorder.record(draft)
+        if self._purchases is not None:
+            # In-app COMPRA_REGISTRADA notice; best effort, so a core
+            # error here never undoes a recorded purchase.
+            await self._purchases.on_purchase_recorded(result)
+        await self._feed_core_health(result)
         # With the retry worker wired, retryable items are enqueued and the final
-        # message is sent by the worker when the last one resolves (task 10.2).
+        # message is sent by the worker when the last one resolves.
         # Without it, finalize returns the message to send right away.
         final = (
             await self._retry.finalize(draft, result)
@@ -247,6 +264,32 @@ class InboundHandler:
             await self._deps.state.clear_conversation(sender)
             return
         await self._save(sender, State.AWAITING_CONFIRMATION, outcome.draft)
+
+    # --- health counters --------------------------------------
+
+    async def _feed_ai_health(self, *, ok: bool) -> None:
+        """Feed the AI-failure counter so repeated unreadable readings alert. An
+        empty extraction is the failure signal; a usable one resets the streak.
+        No-op when the monitor is not wired."""
+        if self._monitor is None:
+            return
+        if ok:
+            await self._monitor.record_ai_success()
+        else:
+            await self._monitor.record_ai_error()
+
+    async def _feed_core_health(self, result: RecordingResult) -> None:
+        """Feed the core-failure counter from the recording outcome: a transient
+        failure (the core was down, not a missing supply) counts, anything else
+        clears the streak. The CoreError itself is already caught by the recorder;
+        this only reports the verdict. No-op when the monitor is not wired."""
+        if self._monitor is None:
+            return
+        transient = any(item.falha is FailureKind.TRANSIENT for item in result.itens)
+        if transient:
+            await self._monitor.record_core_failure()
+        else:
+            await self._monitor.record_core_success()
 
     # --- persistence helpers ----------------------------------------------
 

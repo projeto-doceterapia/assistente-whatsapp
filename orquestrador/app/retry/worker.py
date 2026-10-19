@@ -40,9 +40,11 @@ Replayer = Callable[[Draft], Awaitable[RecordingResult]]
 
 class AlertRaiser(Protocol):
     """Port for an operational alert when an item exhausts its retries: items
-    that could not be recorded are raised as an operational alert."""
+    that could not be recorded are raised as an operational alert. The
+    retry worker hands the whole DLQ item so the alert can derive a stable,
+    non-sensitive dedup suffix; it never puts item content in the alert text."""
 
-    async def raise_alert(self, mensagem: str) -> None: ...
+    async def raise_dlq_item(self, item: object) -> None: ...
 
 
 class RetryWorker:
@@ -182,9 +184,9 @@ class RetryWorker:
             },
         )
         if self._alerts is not None:
-            await self._alerts.raise_alert(
-                f"Item sem registro após esgotar as tentativas: {item.nome}."
-            )
+            # The whole item is passed so the alert derives its dedup suffix; its
+            # content never reaches the owner-facing alert text (ops owns that).
+            await self._alerts.raise_dlq_item(item)
         await self._complete_if_last(item.fluxo_id)
 
     async def _definitive(self, item: RetryItem, motivo: str | None) -> None:

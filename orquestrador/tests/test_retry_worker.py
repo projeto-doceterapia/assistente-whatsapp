@@ -58,10 +58,10 @@ class FixedRandom:
 
 class RecordingAlerts:
     def __init__(self) -> None:
-        self.mensagens: list[str] = []
+        self.items: list[object] = []
 
-    async def raise_alert(self, mensagem: str) -> None:
-        self.mensagens.append(mensagem)
+    async def raise_dlq_item(self, item: object) -> None:
+        self.items.append(item)
 
 
 def _settings(**overrides) -> RetrySettings:
@@ -213,7 +213,10 @@ async def test_dlq_after_max_attempts_and_alert() -> None:
             await worker.poll_once()
 
     assert await state.dlq_size() == 1
-    assert len(alerts.mensagens) == 1
+    assert len(alerts.items) == 1
+    # the DLQ alert carries the exhausted retry item, so ops can derive a stable
+    # dedup suffix without putting item content in the alert text.
+    assert alerts.items[0].nome == "Arroz"
     # the final message was sent once, reporting the failure.
     assert len(channel.sent_texts) == 1
     assert "Não consegui registrar" in channel.sent_texts[0].text

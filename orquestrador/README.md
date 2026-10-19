@@ -161,6 +161,45 @@ when none is wired, alerting is disabled.
 | `DELIVERY_CONFIRM_MAX_TENTATIVAS` | no | `6` | no | confirmation retry attempts per poll |
 | `DELIVERY_CLAIM_TTL_S` | no | `120` | no | how long a send claim without a channel message id is tolerated before recovery treats it as 'send outcome unknown' (seconds) |
 
+## Operational alerts and purchase record
+
+The `app/ops` package surfaces operational problems and records purchases.
+Every operational problem becomes an in-app
+`ALERTA_OPERACIONAL` notification through `POST /notificacoes`, so the owner sees
+it in the web app even when WhatsApp is the failing part; when the channel
+reports healthy it is also sent on WhatsApp, and when the channel is down only
+the in-app alert is created. A per-condition cool-down key in Redis prevents
+alert storms (default 30 min), and alert texts state the condition only, never
+receipt data or secrets.
+
+A background `HealthMonitor` polls the WhatsApp session (`ChannelPort.health()`),
+Redis (`ping`) and the core, counting consecutive core failures so a single blip
+does not alert. The retry worker calls `OperationalAlerts.raise_dlq_item(item)`
+when it moves an item to the DLQ, and `HealthMonitor.record_ai_error()` tracks
+repeated AI failures. `main` starts and stops the monitor in the FastAPI
+lifespan alongside the delivery worker.
+
+After each fully or partially recorded purchase, `PurchaseNotifier
+.on_purchase_recorded(summary)` creates one in-app `COMPRA_REGISTRADA`
+notification (in-app only; the core defaults it to `NAO_ENVIAR`). It is wired by
+passing it right after `Recorder.record(draft)` returns in
+`app/flow/handler.py` (`_record`, after line 189), as the recorder's purchase
+listener; it is a best effort, so a core error there never undoes a recorded
+purchase.
+
+The flow's supply-categories provider (`FlowDeps.categorias_provider`) is the
+cached `CategoriasProvider`: it reads `GET /categorias-insumo` with a short TTL
+cache and falls back to the single default category `A classificar` when the
+core is down and nothing is cached, so extraction still proceeds.
+
+| Variable | Required | Default | Secret | Used by |
+|---|---|---|---|---|
+| `OPS_ALERT_COOLDOWN_S` | no | `1800` | no | per-condition alert dedup/cool-down window (seconds) |
+| `OPS_CORE_FAILURE_THRESHOLD` | no | `3` | no | consecutive core failures before a core-down alert |
+| `OPS_AI_FAILURE_THRESHOLD` | no | `3` | no | consecutive AI failures before a repeated-AI-errors alert |
+| `OPS_CATEGORIAS_TTL_S` | no | `300` | no | TTL of the cached supply categories (seconds) |
+| `OPS_HEALTH_POLL_INTERVAL_S` | no | `60` | no | health monitor poll interval (seconds) |
+
 ## Item recording retry
 
 The `app/retry` package retries purchase items that failed transiently and drives

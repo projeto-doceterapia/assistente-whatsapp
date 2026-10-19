@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -16,10 +17,12 @@ from app.core.errors import (
 from app.core.models import (
     ConfirmacaoEnvioRequest,
     MovimentoRequest,
+    NotificacaoRequest,
     ObterOuCriarRequest,
     OrigemMovimentacao,
     StatusEnvioNotificacao,
     StatusNotaFiscal,
+    TipoNotificacao,
     UnidadeMedida,
 )
 from app.core.stub import CoreStub
@@ -199,3 +202,90 @@ async def test_confirmar_envio_posts_status() -> None:
             5, ConfirmacaoEnvioRequest(statusEnvio=StatusEnvioNotificacao.ENVIADA, canalMessageId="m1")
         )
     assert stub.requests[0].url.path == "/notificacoes/5/confirmacao-envio"
+
+
+async def test_listar_categorias_parses_items() -> None:
+    stub = CoreStub()
+    stub.json(
+        "GET",
+        "/categorias-insumo",
+        200,
+        [
+            {"idCategoriaInsumo": 1, "nome": "Farináceos", "descricao": "Farinhas"},
+            {"idCategoriaInsumo": 2, "nome": "Laticínios", "descricao": None},
+        ],
+    )
+    async with stub.client() as http:
+        categorias = await CoreClient(http).listar_categorias()
+    assert [c.idCategoriaInsumo for c in categorias] == [1, 2]
+    assert categorias[0].nome == "Farináceos"
+    assert categorias[1].descricao is None
+
+
+async def test_listar_categorias_server_error_is_transient() -> None:
+    stub = CoreStub()
+    stub.status("GET", "/categorias-insumo", 503)
+    async with stub.client() as http:
+        with pytest.raises(CoreServerError) as exc:
+            await CoreClient(http).listar_categorias()
+    assert exc.value.transient is True
+
+
+async def test_listar_categorias_timeout_is_transient() -> None:
+    stub = CoreStub()
+    stub.timeout("GET", "/categorias-insumo")
+    async with stub.client() as http:
+        with pytest.raises(CoreTimeoutError) as exc:
+            await CoreClient(http).listar_categorias()
+    assert exc.value.transient is True
+
+
+async def test_criar_notificacao_posts_body() -> None:
+    stub = CoreStub()
+    stub.json("POST", "/notificacoes", 201, {"idNotificacao": 42})
+    async with stub.client() as http:
+        await CoreClient(http).criar_notificacao(
+            NotificacaoRequest(
+                tipo=TipoNotificacao.COMPRA_REGISTRADA,
+                titulo="Compra registrada",
+                mensagem="2 itens registrados.",
+            )
+        )
+    sent = stub.requests[0]
+    assert sent.url.path == "/notificacoes"
+    body = json.loads(sent.content)
+    assert body["tipo"] == "COMPRA_REGISTRADA"
+    assert body["titulo"] == "Compra registrada"
+    # Optional fields are omitted when unset (exclude_none).
+    assert "fkPedido" not in body
+    assert "fkInsumo" not in body
+
+
+async def test_criar_notificacao_validation_422() -> None:
+    stub = CoreStub()
+    stub.status("POST", "/notificacoes", 422)
+    async with stub.client() as http:
+        with pytest.raises(CoreValidationError) as exc:
+            await CoreClient(http).criar_notificacao(
+                NotificacaoRequest(
+                    tipo=TipoNotificacao.ALERTA_OPERACIONAL,
+                    titulo="x" * 151,
+                    mensagem="m",
+                )
+            )
+    assert exc.value.transient is False
+
+
+async def test_criar_notificacao_server_error_is_transient() -> None:
+    stub = CoreStub()
+    stub.status("POST", "/notificacoes", 500)
+    async with stub.client() as http:
+        with pytest.raises(CoreServerError) as exc:
+            await CoreClient(http).criar_notificacao(
+                NotificacaoRequest(
+                    tipo=TipoNotificacao.ALERTA_OPERACIONAL,
+                    titulo="Alerta",
+                    mensagem="m",
+                )
+            )
+    assert exc.value.transient is True

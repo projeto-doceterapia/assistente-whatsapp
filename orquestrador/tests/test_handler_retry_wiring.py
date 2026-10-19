@@ -25,6 +25,7 @@ from app.llm.fake import FakeLlmProvider
 from app.llm.schemas import AcaoItem
 from app.purchase.extracao import ExtracaoService
 from app.purchase.rendering import Categoria
+from app.recording.models import RecordingResult
 from app.retry.coordinator import RetryCoordinator
 from app.retry.settings import RetrySettings
 from app.retry.state import RetryState
@@ -125,3 +126,45 @@ async def test_retryable_failure_sends_final_immediately_without_coordinator() -
     # is cleared.
     assert any("Não consegui" in t.text for t in channel.sent_texts)
     assert await state.load_conversation(BENEFICIARIA) == {}
+
+
+class _SpyPurchases:
+    """Captures the recording summary the handler forwards after recording."""
+
+    def __init__(self) -> None:
+        self.calls: list[RecordingResult] = []
+
+    async def on_purchase_recorded(self, summary: RecordingResult) -> None:
+        self.calls.append(summary)
+
+
+async def test_handler_notifies_purchase_recorded_after_record() -> None:
+    stub = CoreStub()
+    stub.on("POST", "/estoque/movimentos", _ok_movimento)
+    channel = FakeChannel()
+    state = FakeState()
+    purchases = _SpyPurchases()
+    async with stub.client() as http:
+        handler = InboundHandler(_deps(http, state, channel), None, purchases)
+        await handler._record(BENEFICIARIA, _draft())  # noqa: SLF001 - unit under test
+
+    # The notifier was called exactly once, with the recording result whose only
+    # item was recorded OK.
+    assert len(purchases.calls) == 1
+    summary = purchases.calls[0]
+    assert summary.all_ok
+    assert [item.nome for item in summary.recorded] == ["Arroz"]
+
+
+def _ok_movimento(request: httpx.Request) -> httpx.Response:
+    return httpx.Response(
+        201,
+        json={
+            "idMovimentacao": 1,
+            "insumoId": 1,
+            "tipo": "ENTRADA_COMPRA",
+            "quantidade": "10",
+            "saldoAtual": "10",
+            "duplicado": False,
+        },
+    )

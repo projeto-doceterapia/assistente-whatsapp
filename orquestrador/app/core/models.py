@@ -105,3 +105,43 @@ class AgendaItem(BaseModel):
 class ConfirmacaoEnvioRequest(BaseModel):
     statusEnvio: StatusEnvioNotificacao
     canalMessageId: str | None = None
+
+
+class CategoriaInsumo(BaseModel):
+    """A supply category as returned by GET /categorias-insumo.
+
+    Only `idCategoriaInsumo` and `nome` are used by the flow (classification);
+    `descricao` is kept optional for completeness of the core response shape.
+    """
+
+    idCategoriaInsumo: int
+    nome: str
+    descricao: str | None = None
+
+
+class TipoNotificacao(str, Enum):
+    """The notification types the core accepts. The orchestrator
+    only creates the two it owns: COMPRA_REGISTRADA (in-app record of a recorded
+    purchase) and ALERTA_OPERACIONAL (operational alert)."""
+
+    ESTOQUE_BAIXO = "ESTOQUE_BAIXO"
+    DIA_LOTADO = "DIA_LOTADO"
+    RESUMO_INICIO_DIA = "RESUMO_INICIO_DIA"
+    RESUMO_FIM_DIA = "RESUMO_FIM_DIA"
+    COMPRA_REGISTRADA = "COMPRA_REGISTRADA"
+    ALERTA_OPERACIONAL = "ALERTA_OPERACIONAL"
+
+
+class NotificacaoRequest(BaseModel):
+    """Request body for POST /notificacoes (NotificacaoRequestDTO).
+
+    Manually/orchestrator created notifications are in-app only: the core
+    defaults their status_envio to NAO_ENVIAR, so no delivery field
+    is sent here. `titulo` is capped at 150 chars by the core validation.
+    """
+
+    tipo: TipoNotificacao
+    titulo: str
+    mensagem: str
+    fkPedido: int | None = None
+    fkInsumo: int | None = None
