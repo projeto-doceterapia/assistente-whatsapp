@@ -19,6 +19,7 @@ from app.core.client import CoreClient
 from app.core.models import OrigemMovimentacao, UnidadeMedida
 from app.flow.ports import ClassifierPort, StatePort
 from app.llm.port import ImageInput, LlmPort
+from app.llm.retry import RetrySettings, Sleeper
 from app.llm.schemas import AcaoItem, ItemExtraido
 from app.media.preprocess import PreprocessConfig
 from app.purchase.extracao import ExtracaoService
@@ -115,6 +116,8 @@ class FlowDeps:
     categorias_provider: CategoriasProvider
     max_ajustes: int = 2
     preprocess_config: PreprocessConfig | None = None
+    llm_retry: RetrySettings | None = None
+    llm_retry_sleep: Sleeper | None = None
 
     async def categorias(self) -> list[Categoria]:
         return await self.categorias_provider()

@@ -19,6 +19,7 @@ from app.flow.models import Draft, DraftItem, FlowDeps
 from app.invoice import decode_image, resolve_access_key
 from app.invoice.models import DecodedCode
 from app.llm.port import ImageInput
+from app.llm.retry import retry_transient
 from app.media.preprocess import MediaError, preprocess_image
 from app.purchase.rendering import Categoria
 from app.purchase.validacao import consolidar, validar_item
@@ -43,8 +44,12 @@ class ExtractionStep:
             raise UnsupportedPurchaseError("no usable purchase content")
 
         pagina = await self._deps.core.listar_catalogo()
-        resultado = await self._deps.extracao.extrair(
-            pagina, categorias, text=text, image=image
+        resultado = await retry_transient(
+            lambda: self._deps.extracao.extrair(
+                pagina, categorias, text=text, image=image
+            ),
+            self._deps.llm_retry,
+            self._deps.llm_retry_sleep,
         )
 
         if chave is None:

@@ -35,7 +35,10 @@ from app.flow.extraction import ExtractionStep, UnsupportedPurchaseError
 from app.flow.intent import ReplyIntent
 from app.flow.messages import cancel_confirmed
 from app.flow.models import ConfirmationOutcome, Draft, FlowDeps
+from app.llm.port import LlmInvalidOutputError, LlmProviderError
 from app.messages import (
+    assistant_unavailable,
+    extraction_failed,
     new_purchase_while_pending,
     nothing_pending,
     reading_ack,
@@ -189,20 +192,40 @@ class InboundHandler:
             await self._reply(sender, unsupported_type())
             await self._deps.state.clear_conversation(sender)
             return
+        except LlmProviderError:
+            # The AI provider failed even after the bounded transient retry: the
+            # assistant is unavailable, nothing was recorded, the conversation
+            # stays where it was (no draft written, no adjustment consumed), and
+            # the failure is the only thing that feeds the AI-error alert.
+            await self._feed_ai_health(ok=False)
+            await self._reply(sender, assistant_unavailable())
+            return
+        except LlmInvalidOutputError:
+            # The provider answered with nothing usable: an extraction failure,
+            # handled like an unreadable reading below, never an alert.
+            await self._handle_unreadable(message)
+            return
 
         if not draft.itens:
-            # Nothing understood: treat a loose reply as "nothing pending". An
-            # empty reading is the AI-failure signal the health monitor counts
-            # (task 13.1); the owner-facing reply is unchanged.
-            await self._feed_ai_health(ok=False)
-            await self._reply(sender, nothing_pending())
-            await self._deps.state.clear_conversation(sender)
+            await self._handle_unreadable(message)
             return
 
         await self._feed_ai_health(ok=True)
         await self._reply(sender, reading_ack())
         outcome = await self._confirmation.build(draft)
         await self._finish_confirmation(sender, outcome)
+
+    async def _handle_unreadable(self, message: InboundMessage) -> None:
+        """Extraction read nothing usable (blurry photo, unreadable text). Ask
+        for a clearer photo or a typed message when a photo was sent; a loose
+        text reply with no active flow is still answered "nothing pending". No
+        operational alert is raised, and the conversation state is left clean."""
+        sender = message.sender
+        if message.kind is MessageKind.IMAGE:
+            await self._reply(sender, extraction_failed())
+        else:
+            await self._reply(sender, nothing_pending())
+        await self._deps.state.clear_conversation(sender)
 
     async def _apply_adjustment(
         self, message: InboundMessage, draft: Draft | None, adjustments_done: int
@@ -268,9 +291,10 @@ class InboundHandler:
     # --- health counters --------------------------------------
 
     async def _feed_ai_health(self, *, ok: bool) -> None:
-        """Feed the AI-failure counter so repeated unreadable readings alert. An
-        empty extraction is the failure signal; a usable one resets the streak.
-        No-op when the monitor is not wired."""
+        """Feed the AI-failure counter. Only a provider failure (timeout, 5xx,
+        quota, auth, network) counts as an error; a usable reading resets the
+        streak. An empty or invalid reading is an extraction failure and never
+        touches this counter. No-op when the monitor is not wired."""
         if self._monitor is None:
             return
         if ok:

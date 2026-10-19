@@ -121,6 +121,16 @@ The catalog search loop is capped by two settings passed to `ExtracaoService`:
 `rodadas-busca` (default 1) and the per-search candidate limit
 (default 200).
 
+A transient provider failure (timeout, network, 429, 5xx) during extraction is
+retried briefly with exponential backoff before the owner is told the assistant
+is unavailable; an unreadable reading and a non-transient error (400/401/403,
+permanent quota) are not retried. The bounds come from the environment:
+
+| Variable | Required | Default | Secret | Used by |
+|---|---|---|---|---|
+| `LLM_MAX_TENTATIVAS` | no | `3` | no | total extraction attempts on a transient provider error (1 call + retries) |
+| `LLM_BACKOFF_BASE_S` | no | `1` | no | first backoff before a transient retry (seconds), doubling each attempt |
+
 ## Notification delivery
 
 The `app/delivery` package delivers the core's pending notifications to the

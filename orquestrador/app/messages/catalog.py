@@ -145,6 +145,29 @@ def unsupported_type() -> str:
     return "Só consigo ler foto da nota fiscal ou texto da compra. Pode me enviar assim?"
 
 
+def extraction_failed() -> str:
+    """Leitura sem itens: pede uma foto mais nítida ou texto.
+
+    Separate from the provider-unavailable message: here the assistant worked,
+    it just could not read the purchase, so it asks for clearer input and raises
+    no alert."""
+    return (
+        "Não consegui entender essa compra. Pode me mandar uma foto mais nítida "
+        "da nota, ou escrever o que você comprou?"
+    )
+
+
+def assistant_unavailable() -> str:
+    """Falha do provedor de IA após as tentativas.
+
+    The assistant itself is unavailable; nothing was recorded and the owner is
+    asked to try again later. This path feeds the AI-error alert."""
+    return (
+        "Opa, não consegui processar agora — tive um problema aqui do meu lado. "
+        "Não registrei nada. Pode tentar de novo daqui a pouco?"
+    )
+
+
 def nothing_pending() -> str:
     """Sem fluxo pendente."""
     return (

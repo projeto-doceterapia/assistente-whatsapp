@@ -21,6 +21,29 @@ class LlmResponseError(LlmError):
     """The provider returned a body that does not validate against the schema."""
 
 
+class LlmInvalidOutputError(LlmError):
+    """The provider replied, but the body violates the schema.
+
+    This is an EXTRACTION-side failure, not a provider outage: the model was
+    reachable and answered, the answer is just unusable. The flow asks for a
+    clearer photo or a typed message and raises no operational alert.
+    """
+
+
+class LlmProviderError(LlmError):
+    """The provider call itself failed: timeout, network, 5xx, 429, auth, quota.
+
+    ``transient`` tells the extraction path whether a brief retry is worth it:
+    timeouts, connection errors, HTTP 429 and 5xx are transient; 400/401/403 and
+    a permanently exhausted quota are not. A provider error that outlives the
+    bounded retry is the only signal that feeds the AI-error alert.
+    """
+
+    def __init__(self, message: str, *, transient: bool) -> None:
+        super().__init__(message)
+        self.transient = transient
+
+
 @dataclass(frozen=True)
 class ImageInput:
     """A raw image to send to the model, with its MIME type."""

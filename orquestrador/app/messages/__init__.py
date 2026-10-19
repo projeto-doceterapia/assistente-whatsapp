@@ -17,6 +17,8 @@ from app.messages.catalog import (
     retry_window_expired,
     third_adjustment,
     unsupported_type,
+    assistant_unavailable,
+    extraction_failed,
 )
 from app.messages.types import (
     ConfirmationItem,
@@ -42,6 +44,8 @@ __all__ = [
     "retry_window_expired",
     "third_adjustment",
     "unsupported_type",
+    "assistant_unavailable",
+    "extraction_failed",
     "ConfirmationItem",
     "FailedItem",
     "ItemMarker",

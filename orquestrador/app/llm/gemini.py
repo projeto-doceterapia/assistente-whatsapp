@@ -4,12 +4,13 @@ from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 
+from app.llm.errors import classify_provider_error
 from app.llm.port import (
     GeminiSettings,
     ImageInput,
     LlmConfigError,
+    LlmInvalidOutputError,
     LlmRequest,
-    LlmResponseError,
     Schema,
 )
 
@@ -66,15 +67,22 @@ class GeminiProvider:
             response_mime_type="application/json",
             response_schema=schema,
         )
-        response = await client.aio.models.generate_content(  # type: ignore[attr-defined]
-            model=self._settings.model,
-            contents=contents,
-            config=config,
-        )
+        try:
+            response = await client.aio.models.generate_content(  # type: ignore[attr-defined]
+                model=self._settings.model,
+                contents=contents,
+                config=config,
+            )
+        except LlmConfigError:
+            raise
+        except Exception as exc:  # SDK/httpx failure -> typed provider error.
+            raise classify_provider_error(exc) from exc
         raw = getattr(response, "text", None)
         if not raw:
-            raise LlmResponseError("Gemini returned an empty body")
+            # The provider answered, but with nothing usable: an extraction-side
+            # failure, not an outage, so it never feeds the AI-error alert.
+            raise LlmInvalidOutputError("Gemini returned an empty body")
         try:
             return schema.model_validate_json(raw)
         except ValidationError as exc:
-            raise LlmResponseError("Gemini body does not match the schema") from exc
+            raise LlmInvalidOutputError("Gemini body does not match the schema") from exc
