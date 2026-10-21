@@ -1,0 +1,184 @@
+{
+  "versao": "1",
+  "threshold": "0.90",
+  "catalogo": {
+    "categorias": [
+      { "idCategoriaInsumo": 1, "nome": "Farinhas e amidos" },
+      { "idCategoriaInsumo": 2, "nome": "Açúcares e adoçantes" },
+      { "idCategoriaInsumo": 3, "nome": "Laticínios" },
+      { "idCategoriaInsumo": 4, "nome": "Gorduras e óleos" },
+      { "idCategoriaInsumo": 5, "nome": "Chocolates e cacau" },
+      { "idCategoriaInsumo": 6, "nome": "Ovos" },
+      { "idCategoriaInsumo": 7, "nome": "Fermentos e essências" },
+      { "idCategoriaInsumo": 8, "nome": "A classificar" }
+    ],
+    "insumos": [
+      { "idInsumo": 1, "nome": "Farinha de trigo", "unidade": "KG" },
+      { "idInsumo": 2, "nome": "Açúcar refinado", "unidade": "KG" },
+      { "idInsumo": 3, "nome": "Açúcar de confeiteiro", "unidade": "G" },
+      { "idInsumo": 4, "nome": "Açúcar cristal", "unidade": "KG" },
+      { "idInsumo": 5, "nome": "Amido de milho", "unidade": "G" },
+      { "idInsumo": 6, "nome": "Fermento químico", "unidade": "G" },
+      { "idInsumo": 7, "nome": "Fermento biológico seco", "unidade": "G" },
+      { "idInsumo": 8, "nome": "Essência de baunilha", "unidade": "ML" },
+      { "idInsumo": 9, "nome": "Leite integral", "unidade": "L" },
+      { "idInsumo": 10, "nome": "Leite condensado", "unidade": "G" },
+      { "idInsumo": 11, "nome": "Creme de leite", "unidade": "G" },
+      { "idInsumo": 12, "nome": "Manteiga sem sal", "unidade": "G" },
+      { "idInsumo": 13, "nome": "Margarina", "unidade": "G" },
+      { "idInsumo": 14, "nome": "Óleo de soja", "unidade": "L" },
+      { "idInsumo": 15, "nome": "Chocolate em pó", "unidade": "KG" },
+      { "idInsumo": 16, "nome": "Cacau em pó", "unidade": "G" },
+      { "idInsumo": 17, "nome": "Chocolate meio amargo em barra", "unidade": "G" },
+      { "idInsumo": 18, "nome": "Granulado de chocolate", "unidade": "G" },
+      { "idInsumo": 19, "nome": "Ovo", "unidade": "UNIDADE" },
+      { "idInsumo": 20, "nome": "Sal refinado", "unidade": "G" },
+      { "idInsumo": 21, "nome": "Coco ralado", "unidade": "G" },
+      { "idInsumo": 22, "nome": "Leite em pó", "unidade": "G" },
+      { "idInsumo": 23, "nome": "Gelatina sem sabor", "unidade": "G" },
+      { "idInsumo": 24, "nome": "Forma de papel nº 0", "unidade": "UNIDADE" },
+      { "idInsumo": 25, "nome": "Água", "unidade": "L" }
+    ]
+  },
+  "casos": [
+    {
+      "id": "txt-01-saco-farinha",
+      "descricao": "Duas embalagens iguais, preço simples: '2 sacos de 5kg de farinha de trigo por 38,90'.",
+      "tipo": "texto",
+      "texto": "comprei 2 sacos de 5kg de farinha de trigo por 38,90",
+      "itens_esperados": [
+        {
+          "acao": "ATUALIZAR",
+          "insumo_id": 1,
+          "unidade": "KG",
+          "quantidade_total": "10",
+          "custo_unitario": "3.8900"
+        }
+      ]
+    },
+    {
+      "id": "txt-02-desconto",
+      "descricao": "Linha com desconto: valor líquido após abater o desconto do item.",
+      "tipo": "texto",
+      "texto": "3 pacotes de açúcar refinado de 1kg, de 15,00 com 3,00 de desconto",
+      "itens_esperados": [
+        {
+          "acao": "ATUALIZAR",
+          "insumo_id": 2,
+          "unidade": "KG",
+          "quantidade_total": "3",
+          "custo_unitario": "4.0000"
+        }
+      ]
+    },
+    {
+      "id": "txt-03-conversao-ml-l",
+      "descricao": "Conversão ml -> l: '2 garrafas de 900 ml de leite integral' com insumo em litros.",
+      "tipo": "texto",
+      "texto": "comprei 2 garrafas de 900 ml de leite integral por 7,80",
+      "itens_esperados": [
+        {
+          "acao": "ATUALIZAR",
+          "insumo_id": 9,
+          "unidade": "L",
+          "quantidade_total": "1.8",
+          "custo_unitario": "4.3333"
+        }
+      ]
+    },
+    {
+      "id": "txt-04-g-e-unidade",
+      "descricao": "Unidades g e un em linhas distintas: fermento em g e ovos por unidade.",
+      "tipo": "texto",
+      "texto": "um pacote de 500 g de fermento químico por 8,40 e 30 unidades de ovo por 24,00",
+      "itens_esperados": [
+        {
+          "acao": "ATUALIZAR",
+          "insumo_id": 6,
+          "unidade": "G",
+          "quantidade_total": "500",
+          "custo_unitario": "0.0168"
+        },
+        {
+          "acao": "ATUALIZAR",
+          "insumo_id": 19,
+          "unidade": "UNIDADE",
+          "quantidade_total": "30",
+          "custo_unitario": "0.8000"
+        }
+      ]
+    },
+    {
+      "id": "txt-05-item-novo",
+      "descricao": "Item fora do catálogo: deve propor criação na categoria padrão 'A classificar'.",
+      "tipo": "texto",
+      "texto": "comprei 2 potes de 200 g de corante em gel vermelho por 18,00",
+      "itens_esperados": [
+        {
+          "acao": "CRIAR",
+          "nome": "Corante em gel vermelho",
+          "unidade": "G",
+          "quantidade_total": "400",
+          "custo_unitario": "0.0450",
+          "categoria_nome": "A classificar"
+        }
+      ]
+    },
+    {
+      "id": "txt-06-ambiguo",
+      "descricao": "Descrição genérica demais para decidir: deve pedir esclarecimento, nada gravado.",
+      "tipo": "texto",
+      "texto": "comprei 2 kg de uma coisa aí por 10,00",
+      "itens_esperados": [
+        { "acao": "ESCLARECER" }
+      ]
+    },
+    {
+      "id": "txt-07-consolidar",
+      "descricao": "Mesmo insumo em duas linhas: deve consolidar em um único item somando quantidade e valor.",
+      "tipo": "texto",
+      "texto": "3 kg de chocolate em pó por 45,00 e mais 2 kg de chocolate em pó por 30,00",
+      "itens_esperados": [
+        {
+          "acao": "ATUALIZAR",
+          "insumo_id": 15,
+          "unidade": "KG",
+          "quantidade_total": "5",
+          "custo_unitario": "15.0000"
+        }
+      ]
+    },
+    {
+      "id": "txt-08-multi-conversao-kg-g",
+      "descricao": "Vários itens, com conversão kg -> g em insumos medidos em gramas.",
+      "tipo": "texto",
+      "texto": "1 pacote de 2 kg de açúcar de confeiteiro por 16,00 e 250 g de cacau em pó por 11,25",
+      "itens_esperados": [
+        {
+          "acao": "ATUALIZAR",
+          "insumo_id": 3,
+          "unidade": "G",
+          "quantidade_total": "2000",
+          "custo_unitario": "0.0080"
+        },
+        {
+          "acao": "ATUALIZAR",
+          "insumo_id": 16,
+          "unidade": "G",
+          "quantidade_total": "250",
+          "custo_unitario": "0.0450"
+        }
+      ]
+    }
+  ],
+  "respostas_fake": {
+    "txt-01-saco-farinha": "{\"itens\":[{\"acao\":\"ATUALIZAR\",\"insumo_id\":1,\"nome_extraido\":\"Farinha de trigo\",\"quantidade_embalagens\":2,\"tamanho_embalagem\":5,\"unidade_embalagem\":\"KG\",\"valor_liquido\":38.90,\"termos_busca\":[]}],\"chave_acesso\":null}",
+    "txt-02-desconto": "{\"itens\":[{\"acao\":\"ATUALIZAR\",\"insumo_id\":2,\"nome_extraido\":\"Açúcar refinado\",\"quantidade_embalagens\":3,\"tamanho_embalagem\":1,\"unidade_embalagem\":\"KG\",\"valor_liquido\":12.00,\"termos_busca\":[]}],\"chave_acesso\":null}",
+    "txt-03-conversao-ml-l": "{\"itens\":[{\"acao\":\"ATUALIZAR\",\"insumo_id\":9,\"nome_extraido\":\"Leite integral\",\"quantidade_embalagens\":2,\"tamanho_embalagem\":900,\"unidade_embalagem\":\"ML\",\"unidade\":\"L\",\"valor_liquido\":7.80,\"termos_busca\":[]}],\"chave_acesso\":null}",
+    "txt-04-g-e-unidade": "{\"itens\":[{\"acao\":\"ATUALIZAR\",\"insumo_id\":6,\"nome_extraido\":\"Fermento químico\",\"quantidade_embalagens\":1,\"tamanho_embalagem\":500,\"unidade_embalagem\":\"G\",\"valor_liquido\":8.40,\"termos_busca\":[]},{\"acao\":\"ATUALIZAR\",\"insumo_id\":19,\"nome_extraido\":\"Ovo\",\"quantidade_embalagens\":30,\"tamanho_embalagem\":1,\"unidade_embalagem\":\"UNIDADE\",\"valor_liquido\":24.00,\"termos_busca\":[]}],\"chave_acesso\":null}",
+    "txt-05-item-novo": "{\"itens\":[{\"acao\":\"CRIAR\",\"nome_extraido\":\"Corante em gel vermelho\",\"quantidade_embalagens\":2,\"tamanho_embalagem\":200,\"unidade_embalagem\":\"G\",\"unidade\":\"G\",\"valor_liquido\":18.00,\"categoria_id\":null,\"termos_busca\":[]}],\"chave_acesso\":null}",
+    "txt-06-ambiguo": "{\"itens\":[{\"acao\":\"ESCLARECER\",\"nome_extraido\":\"uma coisa aí\",\"quantidade_embalagens\":1,\"tamanho_embalagem\":2,\"unidade_embalagem\":\"KG\",\"termos_busca\":[]}],\"chave_acesso\":null}",
+    "txt-07-consolidar": "{\"itens\":[{\"acao\":\"ATUALIZAR\",\"insumo_id\":15,\"nome_extraido\":\"Chocolate em pó\",\"quantidade_embalagens\":1,\"tamanho_embalagem\":3,\"unidade_embalagem\":\"KG\",\"valor_liquido\":45.00,\"termos_busca\":[]},{\"acao\":\"ATUALIZAR\",\"insumo_id\":15,\"nome_extraido\":\"Chocolate em pó\",\"quantidade_embalagens\":1,\"tamanho_embalagem\":2,\"unidade_embalagem\":\"KG\",\"valor_liquido\":30.00,\"termos_busca\":[]}],\"chave_acesso\":null}",
+    "txt-08-multi-conversao-kg-g": "{\"itens\":[{\"acao\":\"ATUALIZAR\",\"insumo_id\":3,\"nome_extraido\":\"Açúcar de confeiteiro\",\"quantidade_embalagens\":1,\"tamanho_embalagem\":2,\"unidade_embalagem\":\"KG\",\"unidade\":\"G\",\"valor_liquido\":16.00,\"termos_busca\":[]},{\"acao\":\"ATUALIZAR\",\"insumo_id\":16,\"nome_extraido\":\"Cacau em pó\",\"quantidade_embalagens\":1,\"tamanho_embalagem\":250,\"unidade_embalagem\":\"G\",\"unidade\":\"G\",\"valor_liquido\":11.25,\"termos_busca\":[]}],\"chave_acesso\":null}"
+  }
+}

@@ -1,0 +1,4 @@
+Pronto! Atualizei seu estoque:
+✔ Arroz: 10 kg
+✔ Feijão: 3 kg
+✔ Açúcar: 5 kg

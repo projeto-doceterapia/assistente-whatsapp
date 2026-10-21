@@ -1,0 +1,9 @@
+Registrei estes itens:
+✔ Arroz: 10 kg
+✔ Feijão: 3 kg
+✔ Açúcar: 5 kg
+
+Não consegui registrar:
+⚠ Óleo: o sistema estava fora do ar
+
+Quer que eu tente de novo? É só responder 'tenta de novo'.

@@ -1,0 +1,5 @@
+Entendi esta compra:
+✔ Açúcar: 2 kg
+❓ Produto genérico: você comprou 2 kg de quê? Preciso saber o nome do produto
+
+Me conta o que falta pra eu entender direito?

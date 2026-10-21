@@ -1,0 +1,23 @@
+{
+  "versao": "0",
+  "threshold": "0.90",
+  "catalogo": {
+    "categorias": [
+      { "idCategoriaInsumo": 1, "nome": "Farinhas e amidos" },
+      { "idCategoriaInsumo": 2, "nome": "Açúcares e adoçantes" },
+      { "idCategoriaInsumo": 3, "nome": "Laticínios" },
+      { "idCategoriaInsumo": 4, "nome": "Gorduras e óleos" },
+      { "idCategoriaInsumo": 5, "nome": "Chocolates e cacau" },
+      { "idCategoriaInsumo": 6, "nome": "Ovos" },
+      { "idCategoriaInsumo": 7, "nome": "Fermentos e essências" },
+      { "idCategoriaInsumo": 8, "nome": "A classificar" }
+    ],
+    "insumos": [
+      { "idInsumo": 1, "nome": "Farinha de trigo", "unidade": "KG" },
+      { "idInsumo": 2, "nome": "Açúcar refinado", "unidade": "KG" },
+      { "idInsumo": 15, "nome": "Chocolate em pó", "unidade": "KG" },
+      { "idInsumo": 19, "nome": "Ovo", "unidade": "UNIDADE" }
+    ]
+  },
+  "casos": []
+}
