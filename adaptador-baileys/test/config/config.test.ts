@@ -25,6 +25,12 @@ test('does not require secrets when baileys is disabled', () => {
   assert.equal(config.grupoJid, '')
 })
 
+test('group discovery is off by default and turns on only with DISCOVER_GROUPS=true', () => {
+  assert.equal(loadConfig({ BAILEYS_ENABLED: 'false' }).discoverGroups, false)
+  assert.equal(loadConfig({ BAILEYS_ENABLED: 'false', DISCOVER_GROUPS: 'true' }).discoverGroups, true)
+  assert.equal(loadConfig({ BAILEYS_ENABLED: 'false', DISCOVER_GROUPS: 'yes' }).discoverGroups, false)
+})
+
 test('defaults the media size cap to 8 MiB and honours the override', () => {
   const def = loadConfig({ BAILEYS_ENABLED: 'false' })
   assert.equal(def.mediaMaxBytes, 8388608)

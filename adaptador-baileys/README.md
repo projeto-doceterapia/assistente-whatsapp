@@ -44,6 +44,7 @@ connection (health reports `degraded`); this is used for image verification.
 | `BAILEYS_ENABLED` | no | `true` | Set `false` to run without a WhatsApp connection |
 | `MEDIA_TTL_MS` | no | `120000` | Lifetime of opaque media references |
 | `MEDIA_MAX_BYTES` | no | `8388608` | Max media size (bytes); larger downloads are refused with `413` |
+| `DISCOVER_GROUPS` | no | `false` | Set `true` to log the id and name of every group of the linked account once per run, to find the value for `GRUPO_JID` |
 | `PORT` | no | `8080` | HTTP port |
 | `HOST` | no | `0.0.0.0` | HTTP bind address |
 | `LOG_LEVEL` | no | `info` | pino log level |
@@ -53,6 +54,22 @@ Message content is never logged. Only `image/jpeg`, `image/png` and
 Downloads are capped at `MEDIA_MAX_BYTES` and aborted with `413` once exceeded.
 While the session is unpaired the QR string is logged so the operator can
 render it; keep adapter logs private, since they identify the linked chat.
+
+## Finding the group id
+
+`GRUPO_JID` must be the id of the dedicated group (it ends with `@g.us`). To
+read it, pair the session, then start the adapter once with `DISCOVER_GROUPS=true`.
+After the connection opens it logs a line with the group count, then one line per group of the linked account:
+
+```
+{"msg":"group discovery: group","jid":"1203...@g.us","subject":"Group name"}
+```
+
+Copy the `jid` of the dedicated group into `GRUPO_JID`, then remove
+`DISCOVER_GROUPS` (or set it to `false`) and restart. Only the id and the
+subject are logged, never messages or participants. The list is requested once
+per process, because WhatsApp can rate limit repeated calls; leave the setting
+off in normal operation and keep the logs private.
 
 ## HTTP contract
 
