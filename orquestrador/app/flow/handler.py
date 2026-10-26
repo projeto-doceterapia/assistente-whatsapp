@@ -9,9 +9,11 @@ live in the machine and the steps; the handler only wires one message through.
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 from app.channel.port import InboundMessage, MessageKind
+from app.channels.phone import digits, same_phone
 from app.conversation import (
     ConversationContext,
     Event,
@@ -54,6 +56,10 @@ from app.retry import RetryCoordinator, RetryRequestResult
 _FIELD_ESTADO = "estado"
 _FIELD_DRAFT = "draft"
 
+logger = logging.getLogger("flow.handler")
+
+_TAIL_DIGITS = 4
+
 # A text reply while awaiting confirmation maps to a machine event by intent. A
 # standalone "try again" there is out of context (the retry flow runs in NO_FLOW).
 _INTENT_TO_EVENT = {
@@ -87,8 +93,22 @@ class InboundHandler:
         self._recorder = Recorder(deps.state, deps.core, sink)
 
     async def handle(self, message: InboundMessage) -> None:
-        if message.sender != self._deps.beneficiaria:
+        if not same_phone(message.sender, self._deps.beneficiaria):
             # Only the authorized chat is processed; no content is stored/logged.
+            # The diagnostic carries lengths and the last four digits so an
+            # operator can tell a wrong group id, a missing ninth digit or a
+            # wrong number apart without exposing the numbers.
+            sender_digits = digits(message.sender)
+            expected_digits = digits(self._deps.beneficiaria)
+            logger.info(
+                "inbound_ignored_sender_mismatch",
+                extra={
+                    "sender_len": len(sender_digits),
+                    "sender_tail": sender_digits[-_TAIL_DIGITS:],
+                    "expected_len": len(expected_digits),
+                    "expected_tail": expected_digits[-_TAIL_DIGITS:],
+                },
+            )
             return
         if not await self._deps.state.mark_inbound(message.id):
             return  # already processed (duplicate delivery)
