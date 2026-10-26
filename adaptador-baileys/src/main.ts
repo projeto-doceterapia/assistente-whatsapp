@@ -25,6 +25,10 @@ async function main(): Promise<void> {
       }
       const { needsMedia, ...message } = result.message
       const mediaRef = needsMedia ? media.issue(message.id) : null
+      // Logs only the sender form and the message kind, never any jid, phone,
+      // text or media, so an operator can confirm which sender form real
+      // accounts produce without leaking content.
+      logger.info({ senderKind: result.senderKind, kind: message.kind }, 'inbound forwarded')
       await forwarder.forward({ event: 'message', ...message, mediaRef }).catch((err) => {
         logger.error({ err, messageId: message.id }, 'failed to forward message')
       })

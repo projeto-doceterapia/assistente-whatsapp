@@ -126,6 +126,11 @@ export class BaileysWaSocket implements WaSocket {
     return {
       id: message.key.id ?? '',
       remoteJid: message.key.remoteJid,
+      // For a group message the author is in the key, not in remoteJid.
+      // `participant` is a phone JID or a `@lid`; `participantPn` is its
+      // phone-number alternative when WhatsApp exposes it.
+      participantJid: message.key.participant,
+      participantPn: message.key.participantPn,
       fromMe: message.key.fromMe === true,
       kind,
       text,

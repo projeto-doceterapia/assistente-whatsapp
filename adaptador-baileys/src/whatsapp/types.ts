@@ -25,9 +25,15 @@ export type AdapterEvent =
   | ({ event: 'session' } & SessionEvent)
 
 // Raw inbound as produced by the socket layer, before allowlist filtering.
+// For a group message `remoteJid` is the group id, so the author lives in the
+// message key instead: `participantJid` is Baileys `key.participant` (a phone
+// JID on legacy accounts, a `@lid` on newer ones) and `participantPn` is the
+// phone-number alternative (`key.participantPn`) when WhatsApp exposes it.
 export interface RawInbound {
   id: string
   remoteJid: string | null | undefined
+  participantJid: string | null | undefined
+  participantPn: string | null | undefined
   fromMe: boolean
   kind: MessageKind
   text: string

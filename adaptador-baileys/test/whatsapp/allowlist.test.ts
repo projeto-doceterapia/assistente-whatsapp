@@ -9,6 +9,8 @@ function raw(overrides: Partial<RawInbound> = {}): RawInbound {
   return {
     id: 'm1',
     remoteJid: GROUP,
+    participantJid: null,
+    participantPn: null,
     fromMe: false,
     kind: 'text',
     text: 'oi',
@@ -59,5 +61,43 @@ test('flags image messages as needing a media ref', () => {
   assert.equal(result.allowed, true)
   if (result.allowed) {
     assert.equal(result.message.needsMedia, true)
+  }
+})
+
+test('uses the group participant as the sender, not the group id', () => {
+  const result = filterInbound(raw({ participantJid: '5511999@s.whatsapp.net' }), GROUP)
+  assert.equal(result.allowed, true)
+  if (result.allowed) {
+    assert.equal(result.message.groupJid, GROUP)
+    assert.equal(result.message.senderJid, '5511999@s.whatsapp.net')
+    assert.equal(result.senderKind, 'phone')
+  }
+})
+
+test('falls back to the chat jid when a message carries no participant', () => {
+  const result = filterInbound(raw(), GROUP)
+  assert.equal(result.allowed, true)
+  if (result.allowed) {
+    assert.equal(result.message.senderJid, GROUP)
+    assert.equal(result.senderKind, 'unknown')
+  }
+})
+
+test('keeps the drop reasons and their order unchanged', () => {
+  // not_allowed_chat wins over own_message wins over empty.
+  const notAllowed = filterInbound(raw({ remoteJid: '999@s.whatsapp.net', fromMe: true, text: '  ' }), GROUP)
+  assert.equal(notAllowed.allowed, false)
+  if (!notAllowed.allowed) {
+    assert.equal(notAllowed.reason, 'not_allowed_chat')
+  }
+  const own = filterInbound(raw({ fromMe: true, text: '  ' }), GROUP)
+  assert.equal(own.allowed, false)
+  if (!own.allowed) {
+    assert.equal(own.reason, 'own_message')
+  }
+  const empty = filterInbound(raw({ text: '  ' }), GROUP)
+  assert.equal(empty.allowed, false)
+  if (!empty.allowed) {
+    assert.equal(empty.reason, 'empty')
   }
 })
