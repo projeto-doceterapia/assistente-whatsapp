@@ -13,6 +13,7 @@ import {
   readCapped,
 } from '../media/mediaGuard.js'
 import { logger } from '../config/logger.js'
+import { describeGroups } from './groups.js'
 import { decideReconnect } from './reconnect.js'
 import type {
   HealthState,
@@ -48,6 +49,7 @@ export class BaileysWaSocket implements WaSocket {
   private state: HealthState = 'down'
   private attempt = 0
   private closed = false
+  private groupsListed = false
   private readonly messages = new Map<string, WAMessage>()
 
   constructor(
@@ -55,6 +57,7 @@ export class BaileysWaSocket implements WaSocket {
     private readonly onInbound: InboundHandler,
     private readonly onSession: SessionHandler,
     private readonly mediaMaxBytes: number,
+    private readonly discoverGroups = false,
   ) {}
 
   async start(): Promise<void> {
@@ -81,6 +84,10 @@ export class BaileysWaSocket implements WaSocket {
         this.state = 'connected'
         this.attempt = 0
         void this.onSession({ type: 'connected', timestamp: Date.now() })
+        if (this.discoverGroups && !this.groupsListed) {
+          this.groupsListed = true
+          void this.logGroups(sock)
+        }
       } else if (connection === 'close') {
         this.handleClose(lastDisconnect?.error)
       } else if (connection === 'connecting') {
@@ -97,6 +104,21 @@ export class BaileysWaSocket implements WaSocket {
         void this.onInbound(this.toRaw(message))
       }
     })
+  }
+
+  // One query per process: the group list call can be rate limited by WhatsApp, so
+  // a failure re-arms the next reconnect instead of retrying in a loop.
+  private async logGroups(sock: BaileysSocket): Promise<void> {
+    try {
+      const groups = describeGroups(await sock.groupFetchAllParticipating())
+      logger.info({ count: groups.length }, 'group discovery: groups of the linked account')
+      for (const group of groups) {
+        logger.info(group, 'group discovery: group')
+      }
+    } catch (err) {
+      this.groupsListed = false
+      logger.error({ err }, 'group discovery failed')
+    }
   }
 
   private toRaw(message: WAMessage): RawInbound {

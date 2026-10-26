@@ -37,7 +37,16 @@ async function main(): Promise<void> {
       })
     }
 
-    const baileys = new BaileysWaSocket(config.sessionDir, onInbound, onSession, config.mediaMaxBytes)
+    if (config.discoverGroups) {
+      logger.warn('DISCOVER_GROUPS=true: group ids and names will be logged; turn it off after copying GRUPO_JID')
+    }
+    const baileys = new BaileysWaSocket(
+      config.sessionDir,
+      onInbound,
+      onSession,
+      config.mediaMaxBytes,
+      config.discoverGroups,
+    )
     await baileys.start()
     socket = baileys
   } else {
