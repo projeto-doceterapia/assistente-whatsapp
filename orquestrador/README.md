@@ -1,32 +1,32 @@
 # orquestrador
 
-WhatsApp stock assistant orchestrator. Python 3.12 service (FastAPI) that drives
-the purchase conversation, talks to the core API and keeps conversation state in
-Redis. It is one consumer of the core; it never touches the database directly.
+Orquestrador do assistente de estoque do WhatsApp. Serviço Python 3.12 (FastAPI) que
+conduz a conversa de compra, fala com a API central e mantém o estado da conversa no
+Redis. É um consumidor da central; nunca acessa o banco de dados diretamente.
 
-## Run
+## Executar
 
 ```sh
 pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Health check: `GET /health` returns `{"status":"ok","version":"<v>"}`.
+Verificação de saúde (healthcheck): `GET /health` retorna `{"status":"ok","version":"<v>"}`.
 
-## Test
+## Testar
 
-The service targets Python 3.12. Run the suite in a pinned container:
+O serviço tem como alvo o Python 3.12. Execute a suíte em um contêiner fixado:
 
 ```sh
 docker run --rm -v "$PWD:/app" -w /app python:3.12.7-slim \
   sh -c "pip install -r requirements-dev.txt && python -m pytest -q"
 ```
 
-`pytest-asyncio` is required because the core client and the Redis state layer
-are async (the service runs its workers as asyncio tasks).
+`pytest-asyncio` é necessário porque o cliente da central e a camada de estado no Redis
+são assíncronos (o serviço executa seus workers como tasks asyncio).
 
-The Redis state tests need a real Redis. Point `REDIS_TEST_URL` at one; they
-skip cleanly when it is unset:
+Os testes de estado no Redis precisam de um Redis real. Aponte `REDIS_TEST_URL` para um;
+eles são ignorados de forma limpa quando não definido:
 
 ```sh
 docker run -d --name redis-test -p 127.0.0.1::6379 redis:7
@@ -36,232 +36,231 @@ docker run --rm -e REDIS_TEST_URL="redis://host.docker.internal:$PORT/0" \
   python:3.12.7-slim sh -c "pip install -r requirements-dev.txt && python -m pytest -q"
 ```
 
-## Build the image
+## Construir a imagem
 
 ```sh
 docker build -t orquestrador .
 docker run --rm -p 8000:8000 --env-file .env orquestrador
 ```
 
-## Configuration
+## Configuração
 
-All settings come from environment variables. No value is baked into
-the image. Every name below is read by the code (`app/config.py`, `app/channels/settings.py`
-and `app/llm/port.py`); the `Secret` column flags credentials that must never be
-logged or committed. Only `BENEFICIARIA_TELEFONE`, `CORE_BASE_URL` and
-`REDIS_URL` are required for the service to start; channel and LLM settings are
-read lazily by the components that use them, so `/health` works without them.
+Todas as configurações vêm de variáveis de ambiente. Nenhum valor é embutido na
+imagem. Todos os nomes abaixo são lidos pelo código (`app/config.py`, `app/channels/settings.py`
+e `app/llm/port.py`); a coluna `Segredo` marca as credenciais que nunca devem ser
+registradas em log nem versionadas. Apenas `BENEFICIARIA_TELEFONE`, `CORE_BASE_URL` e
+`REDIS_URL` são obrigatórias para o serviço iniciar; as configurações de canal e de LLM são
+lidas de forma preguiçosa pelos componentes que as usam, então `/health` funciona sem elas.
 
-| Variable | Required | Default | Secret | Used by |
+| Variável | Obrigatória | Padrão | Segredo | Usado por |
 |---|---|---|---|---|
-| `CHANNEL` | no | `baileys` | no | channel selection (`baileys` or `cloud_api`) |
-| `BENEFICIARIA_TELEFONE` | yes | — | no | authorized sender, E.164 |
-| `CORE_BASE_URL` | yes | — | no | core API base URL |
-| `REDIS_URL` | yes | — | no | Redis connection URL |
-| `CONV_TTL_MIN` | no | `30` | no | conversation inactivity TTL (minutes) |
-| `MAX_AJUSTES` | no | `2` | no | allowed free-text adjustments |
-| `RETRY_MAX_TENTATIVAS` | no | `6` | no | retry attempts |
-| `RETRY_BASE_S` | no | `2` | no | retry base backoff (seconds) |
-| `RETRY_CAP_S` | no | `300` | no | retry backoff cap (seconds) |
-| `TZ` | no | `America/Sao_Paulo` | no | time zone |
-| `ADAPTER_URL` | Baileys | — | no | Baileys adapter base URL |
-| `ADAPTER_SECRET` | Baileys | — | yes | shared secret sent as `X-Adapter-Secret` to the adapter |
-| `WEBHOOK_SECRET` | Baileys | — | yes | HMAC-SHA256 key verifying inbound adapter events (`X-Signature-256`) |
-| `CLOUD_API_PHONE_ID` | Cloud API | — | no | Cloud API phone number id |
-| `CLOUD_API_TOKEN` | Cloud API | — | yes | Cloud API access token (Bearer) |
-| `CLOUD_API_APP_SECRET` | Cloud API | — | yes | app secret that verifies `X-Hub-Signature-256` |
-| `CLOUD_API_VERIFY_TOKEN` | Cloud API | — | yes | webhook verification handshake token |
-| `CLOUD_API_GRAPH_VERSION` | no | `v23.0` | no | Graph API version segment |
-| `CLOUD_API_MEDIA_HOSTS` | no | `.fbcdn.net,.facebook.com,.whatsapp.net` | no | comma-separated host suffixes the Cloud API may download media from (HTTPS only); the CDN download drops the bearer token |
-| `MEDIA_MAX_BYTES` | no | `8388608` | no | hard cap on a downloaded media body (bytes); the body is streamed and aborted above this size |
-| `LLM_PROVIDER` | no | `gemini` | no | LLM provider selection |
-| `GEMINI_API_KEY` | Gemini | — | yes | Gemini API key |
-| `GEMINI_MODEL` | Gemini | — | no | Gemini model id (e.g. `gemini-2.0-flash`) |
+| `CHANNEL` | não | `baileys` | não | seleção de canal (`baileys` ou `cloud_api`) |
+| `BENEFICIARIA_TELEFONE` | sim | — | não | remetente autorizado, E.164 |
+| `CORE_BASE_URL` | sim | — | não | URL base da API central |
+| `REDIS_URL` | sim | — | não | URL de conexão do Redis |
+| `CONV_TTL_MIN` | não | `30` | não | TTL de inatividade da conversa (minutos) |
+| `MAX_AJUSTES` | não | `2` | não | ajustes em texto livre permitidos |
+| `RETRY_MAX_TENTATIVAS` | não | `6` | não | tentativas de retry |
+| `RETRY_BASE_S` | não | `2` | não | backoff base do retry (segundos) |
+| `RETRY_CAP_S` | não | `300` | não | teto do backoff do retry (segundos) |
+| `TZ` | não | `America/Sao_Paulo` | não | fuso horário |
+| `ADAPTER_URL` | Baileys | — | não | URL base do adaptador Baileys |
+| `ADAPTER_SECRET` | Baileys | — | sim | segredo compartilhado enviado como `X-Adapter-Secret` ao adaptador |
+| `WEBHOOK_SECRET` | Baileys | — | sim | chave HMAC-SHA256 que verifica eventos de entrada do adaptador (`X-Signature-256`) |
+| `CLOUD_API_PHONE_ID` | Cloud API | — | não | id do número de telefone da Cloud API |
+| `CLOUD_API_TOKEN` | Cloud API | — | sim | token de acesso da Cloud API (Bearer) |
+| `CLOUD_API_APP_SECRET` | Cloud API | — | sim | segredo do app que verifica `X-Hub-Signature-256` |
+| `CLOUD_API_VERIFY_TOKEN` | Cloud API | — | sim | token de handshake de verificação do webhook |
+| `CLOUD_API_GRAPH_VERSION` | não | `v23.0` | não | segmento de versão da Graph API |
+| `CLOUD_API_MEDIA_HOSTS` | não | `.fbcdn.net,.facebook.com,.whatsapp.net` | não | sufixos de host separados por vírgula de onde a Cloud API pode baixar mídia (somente HTTPS); o download no CDN descarta o token bearer |
+| `MEDIA_MAX_BYTES` | não | `8388608` | não | limite rígido do corpo de uma mídia baixada (bytes); o corpo é transmitido em stream e abortado acima desse tamanho |
+| `LLM_PROVIDER` | não | `gemini` | não | seleção do provedor de LLM |
+| `GEMINI_API_KEY` | Gemini | — | sim | chave da API do Gemini |
+| `GEMINI_MODEL` | Gemini | — | não | id do modelo Gemini (ex.: `gemini-2.0-flash`) |
 
-## Channels and notification templates
+## Canais e templates de notificação
 
-Two interchangeable channels implement the same `ChannelPort`
-(`app/channel/port.py`): `BaileysChannel` (unofficial linked device, via the
-`adaptador-baileys` HTTP API) and `CloudApiChannel` (Meta WhatsApp Cloud API).
-`CHANNEL` selects which one runs. Both pass the same contract suite
-(`tests/channel_contract.py`). Their settings are read lazily, only when a
-channel is built, in `app/channels/settings.py`.
+Dois canais intercambiáveis implementam a mesma `ChannelPort`
+(`app/channel/port.py`): `BaileysChannel` (dispositivo vinculado não oficial, via a
+API HTTP do `adaptador-baileys`) e `CloudApiChannel` (Meta WhatsApp Cloud API).
+`CHANNEL` seleciona qual deles executa. Ambos passam na mesma suíte de contrato
+(`tests/channel_contract.py`). Suas configurações são lidas de forma preguiçosa, apenas quando um
+canal é construído, em `app/channels/settings.py`.
 
-Inbound media is downloaded by streaming the response and aborting above
-`MEDIA_MAX_BYTES`, so an oversized body is never fully buffered. For the Cloud
-API two-step flow, the CDN download runs on a separate client that carries no
-`Authorization` header and only accepts HTTPS URLs whose host matches
-`CLOUD_API_MEDIA_HOSTS`, so the Graph bearer token is never sent to the host the
-first step returned.
+A mídia de entrada é baixada transmitindo a resposta em stream e abortando acima de
+`MEDIA_MAX_BYTES`, de modo que um corpo grande demais nunca é totalmente armazenado em buffer. No fluxo
+de duas etapas da Cloud API, o download no CDN roda em um cliente separado que não carrega nenhum
+cabeçalho `Authorization` e só aceita URLs HTTPS cujo host corresponda a
+`CLOUD_API_MEDIA_HOSTS`, de modo que o token bearer da Graph nunca é enviado ao host que a
+primeira etapa retornou.
 
-Proactive notifications are rendered from a single source,
-`app/templates/templates.yaml`. Baileys sends the multi-line rendered text;
-Cloud API always sends the approved template with the same data as body
-parameters. Cloud API forbids line breaks inside template parameters, so
-list-shaped sections are joined inline with ` | `. Empty sections render
-`nada pendente` and are never omitted.
+As notificações proativas são renderizadas a partir de uma única fonte,
+`app/templates/templates.yaml`. O Baileys envia o texto renderizado em múltiplas linhas; a
+Cloud API sempre envia o template aprovado com os mesmos dados como parâmetros do corpo.
+A Cloud API proíbe quebras de linha dentro dos parâmetros do template, então as
+seções em formato de lista são unidas em linha com ` | `. Seções vazias renderizam
+`nada pendente` e nunca são omitidas.
 
-Graph API version and payload shapes were verified against Meta's official
-documentation on 2026-10-20: the latest versions are v24.0/v25.0/v26.0
-(https://developers.facebook.com/docs/graph-api/changelog/versions); v23.0 is
-the pinned default (supported until 2027-10-08). Message, template, webhook and
-media payload shapes follow
-https://developers.facebook.com/docs/whatsapp/cloud-api/reference/messages and
+A versão da Graph API e os formatos de payload foram verificados contra a documentação
+oficial da Meta em 2026-10-20: as versões mais recentes são v24.0/v25.0/v26.0
+(https://developers.facebook.com/docs/graph-api/changelog/versions); v23.0 é
+o padrão fixado (suportado até 2027-10-08). Os formatos de payload de mensagem, template, webhook e
+mídia seguem
+https://developers.facebook.com/docs/whatsapp/cloud-api/reference/messages e
 https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples.
 
-## LLM provider (purchase extraction)
+## Provedor de LLM (extração de compra)
 
-The purchase flow extracts items with an LLM behind `LlmPort`. The
-first provider is Gemini, using the official `google-genai` SDK. It is selected
-and configured through `LLM_PROVIDER`, `GEMINI_API_KEY` and `GEMINI_MODEL`
-(`app/llm/port.py`); tests use a fake provider that replays recorded responses
-and never call the network.
+O fluxo de compra extrai itens com um LLM por trás de `LlmPort`. O
+primeiro provedor é o Gemini, usando o SDK oficial `google-genai`. Ele é selecionado
+e configurado por `LLM_PROVIDER`, `GEMINI_API_KEY` e `GEMINI_MODEL`
+(`app/llm/port.py`); os testes usam um provedor fake que reproduz respostas gravadas
+e nunca chamam a rede.
 
-The catalog search loop is capped by two settings passed to `ExtracaoService`:
-`rodadas-busca` (default 1) and the per-search candidate limit
-(default 200).
+O loop de busca no catálogo é limitado por duas configurações passadas ao `ExtracaoService`:
+`rodadas-busca` (padrão 1) e o limite de candidatos por busca
+(padrão 200).
 
-A transient provider failure (timeout, network, 429, 5xx) during extraction is
-retried briefly with exponential backoff before the owner is told the assistant
-is unavailable; an unreadable reading and a non-transient error (400/401/403,
-permanent quota) are not retried. The bounds come from the environment:
+Uma falha transitória do provedor (timeout, rede, 429, 5xx) durante a extração é
+repetida brevemente com backoff exponencial antes de a dona ser avisada de que o assistente
+está indisponível; uma leitura ilegível e um erro não transitório (400/401/403,
+cota permanente) não são repetidos. Os limites vêm do ambiente:
 
-| Variable | Required | Default | Secret | Used by |
+| Variável | Obrigatória | Padrão | Segredo | Usado por |
 |---|---|---|---|---|
-| `LLM_MAX_TENTATIVAS` | no | `3` | no | total extraction attempts on a transient provider error (1 call + retries) |
-| `LLM_BACKOFF_BASE_S` | no | `1` | no | first backoff before a transient retry (seconds), doubling each attempt |
+| `LLM_MAX_TENTATIVAS` | não | `3` | não | total de tentativas de extração em erro transitório do provedor (1 chamada + retries) |
+| `LLM_BACKOFF_BASE_S` | não | `1` | não | primeiro backoff antes de um retry transitório (segundos), dobrando a cada tentativa |
 
-## Notification delivery
+## Entrega de notificações
 
-The `app/delivery` package delivers the core's pending notifications to the
-owner on WhatsApp. A
-single background worker polls `GET /notificacoes/agenda`, picks one random send
-time inside each notification's window the first time it is seen (persisted in
-Redis, so a restart keeps it), sends through the `ChannelPort` exactly once
-(NX-guarded on `notif:{id}:sent` so two instances never double-send), and
-confirms the outcome to `POST /notificacoes/{id}/confirmacao-envio` with
-exponential backoff. If the core is unavailable during confirmation, the sent
-state is kept so the next poll confirms without resending. When a window closes
-before the notification was sent, it is reported as `FALHA` and an operational
-alert is raised. Immediate alerts use a short window, so with the default 30 s
-poll they reach WhatsApp in about one minute.
+O pacote `app/delivery` entrega as notificações pendentes da central à
+dona no WhatsApp. Um
+único worker em segundo plano consulta `GET /notificacoes/agenda`, escolhe um horário de envio aleatório
+dentro da janela de cada notificação na primeira vez em que ela é vista (persistido no
+Redis, de modo que um restart o mantém), envia pela `ChannelPort` exatamente uma vez
+(protegido por NX em `notif:{id}:sent`, de modo que duas instâncias nunca enviem em duplicidade) e
+confirma o resultado em `POST /notificacoes/{id}/confirmacao-envio` com
+backoff exponencial. Se a central estiver indisponível durante a confirmação, o estado enviado
+é mantido para que a próxima consulta confirme sem reenviar. Quando uma janela fecha
+antes de a notificação ser enviada, ela é reportada como `FALHA` e um alerta
+operacional é disparado. Alertas imediatos usam uma janela curta, então com a consulta padrão de 30 s
+eles chegam ao WhatsApp em cerca de um minuto.
 
-The send guard is stamped with the claim time and, once the channel returns a
-message id, that id is stored under the claim with a compare-and-set, so the
-claim and the id stay consistent. If the service crashes between claiming and
-recording the id, a fresh worker treats the claim as 'send outcome unknown' once
-it is older than `DELIVERY_CLAIM_TTL_S`: it reports `FALHA` and raises an
-operational alert instead of risking a duplicate delivery with a resend. Within
-that TTL a send may still be in flight, so the worker waits and re-checks on a
-later poll. Delivery is therefore at-most-once.
+A trava de envio é marcada com o horário da reivindicação (claim) e, quando o canal retorna um
+id de mensagem, esse id é armazenado sob a claim com um compare-and-set, de modo que a
+claim e o id permaneçam consistentes. Se o serviço quebrar entre reivindicar e
+registrar o id, um worker novo trata a claim como 'send outcome unknown' assim que
+ela for mais antiga que `DELIVERY_CLAIM_TTL_S`: ele reporta `FALHA` e dispara um
+alerta operacional em vez de arriscar uma entrega duplicada com um reenvio. Dentro
+desse TTL um envio ainda pode estar em andamento, então o worker aguarda e reverifica em uma
+consulta posterior. A entrega é, portanto, no máximo uma vez.
 
-`main` wires the worker through `create_delivery_worker(...)` (explicit
-dependencies) and drives its lifecycle with `await worker.start()` /
-`await worker.stop()`. A `Clock` and a `RandomSource` are injected, so tests are
-deterministic. Operational alerts go through an injected `AlertRaiser` port;
-when none is wired, alerting is disabled.
+O `main` conecta o worker por `create_delivery_worker(...)` (dependências
+explícitas) e conduz seu ciclo de vida com `await worker.start()` /
+`await worker.stop()`. Um `Clock` e um `RandomSource` são injetados, de modo que os testes sejam
+determinísticos. Os alertas operacionais passam por uma porta `AlertRaiser` injetada;
+quando nenhuma está conectada, o alerta é desabilitado.
 
-| Variable | Required | Default | Secret | Used by |
+| Variável | Obrigatória | Padrão | Segredo | Usado por |
 |---|---|---|---|---|
-| `DELIVERY_POLL_INTERVAL_S` | no | `30` | no | agenda poll interval (seconds) |
-| `DELIVERY_AGENDA_HORIZON_MIN` | no | `60` | no | how far ahead of now the agenda range extends (minutes) |
-| `DELIVERY_AGENDA_LOOKBACK_MIN` | no | `60` | no | how far back the agenda range reaches, so windows opened while down are still delivered (minutes) |
-| `DELIVERY_CONFIRM_BASE_S` | no | `2` | no | confirmation retry base backoff (seconds) |
-| `DELIVERY_CONFIRM_CAP_S` | no | `60` | no | confirmation retry backoff cap (seconds) |
-| `DELIVERY_CONFIRM_MAX_TENTATIVAS` | no | `6` | no | confirmation retry attempts per poll |
-| `DELIVERY_CLAIM_TTL_S` | no | `120` | no | how long a send claim without a channel message id is tolerated before recovery treats it as 'send outcome unknown' (seconds) |
+| `DELIVERY_POLL_INTERVAL_S` | não | `30` | não | intervalo de consulta da agenda (segundos) |
+| `DELIVERY_AGENDA_HORIZON_MIN` | não | `60` | não | quão à frente de agora o intervalo da agenda se estende (minutos) |
+| `DELIVERY_AGENDA_LOOKBACK_MIN` | não | `60` | não | quão para trás o intervalo da agenda alcança, para que janelas abertas enquanto fora do ar ainda sejam entregues (minutos) |
+| `DELIVERY_CONFIRM_BASE_S` | não | `2` | não | backoff base do retry de confirmação (segundos) |
+| `DELIVERY_CONFIRM_CAP_S` | não | `60` | não | teto do backoff do retry de confirmação (segundos) |
+| `DELIVERY_CONFIRM_MAX_TENTATIVAS` | não | `6` | não | tentativas de retry de confirmação por consulta |
+| `DELIVERY_CLAIM_TTL_S` | não | `120` | não | por quanto tempo uma claim de envio sem id de mensagem do canal é tolerada antes de a recuperação tratá-la como 'send outcome unknown' (segundos) |
 
-## Operational alerts and purchase record
+## Alertas operacionais e registro de compra
 
-The `app/ops` package surfaces operational problems and records purchases.
-Every operational problem becomes an in-app
-`ALERTA_OPERACIONAL` notification through `POST /notificacoes`, so the owner sees
-it in the web app even when WhatsApp is the failing part; when the channel
-reports healthy it is also sent on WhatsApp, and when the channel is down only
-the in-app alert is created. A per-condition cool-down key in Redis prevents
-alert storms (default 30 min), and alert texts state the condition only, never
-receipt data or secrets.
+O pacote `app/ops` expõe problemas operacionais e registra compras.
+Todo problema operacional vira uma notificação in-app
+`ALERTA_OPERACIONAL` via `POST /notificacoes`, de modo que a dona a veja
+no app web mesmo quando o WhatsApp é a parte que falha; quando o canal
+reporta saúde, ela também é enviada no WhatsApp, e quando o canal está fora apenas
+o alerta in-app é criado. Uma chave de cool-down por condição no Redis evita
+tempestades de alerta (padrão 30 min), e os textos dos alertas informam apenas a
+condição, nunca dados de recebimento nem segredos.
 
-A background `HealthMonitor` polls the WhatsApp session (`ChannelPort.health()`),
-Redis (`ping`) and the core, counting consecutive core failures so a single blip
-does not alert. The retry worker calls `OperationalAlerts.raise_dlq_item(item)`
-when it moves an item to the DLQ, and `HealthMonitor.record_ai_error()` tracks
-repeated AI failures. `main` starts and stops the monitor in the FastAPI
-lifespan alongside the delivery worker.
+Um `HealthMonitor` em segundo plano consulta a sessão do WhatsApp (`ChannelPort.health()`),
+o Redis (`ping`) e a central, contando falhas consecutivas da central para que um único soluço
+não alerte. O worker de retry chama `OperationalAlerts.raise_dlq_item(item)`
+quando move um item para a DLQ, e `HealthMonitor.record_ai_error()` rastreia
+falhas repetidas da IA. O `main` inicia e para o monitor no lifespan do FastAPI
+junto ao worker de entrega.
 
-After each fully or partially recorded purchase, `PurchaseNotifier
-.on_purchase_recorded(summary)` creates one in-app `COMPRA_REGISTRADA`
-notification (in-app only; the core defaults it to `NAO_ENVIAR`). It is wired by
-passing it right after `Recorder.record(draft)` returns in
-`app/flow/handler.py` (`_record`, after line 189), as the recorder's purchase
-listener; it is a best effort, so a core error there never undoes a recorded
-purchase.
+Após cada compra registrada total ou parcialmente, `PurchaseNotifier
+.on_purchase_recorded(summary)` cria uma notificação in-app `COMPRA_REGISTRADA`
+(apenas in-app; a central a define por padrão como `NAO_ENVIAR`). Ela é conectada
+passando-a logo após o retorno de `Recorder.record(draft)` em
+`app/flow/handler.py` (`_record`, após a linha 189), como o listener de compra do recorder;
+é um best effort, então um erro da central ali nunca desfaz uma compra registrada.
 
-The flow's supply-categories provider (`FlowDeps.categorias_provider`) is the
-cached `CategoriasProvider`: it reads `GET /categorias-insumo` with a short TTL
-cache and falls back to the single default category `A classificar` when the
-core is down and nothing is cached, so extraction still proceeds.
+O provedor de categorias de insumo do fluxo (`FlowDeps.categorias_provider`) é o
+`CategoriasProvider` em cache: ele lê `GET /categorias-insumo` com um cache de TTL curto
+e recorre à única categoria padrão `A classificar` quando a
+central está fora e nada está em cache, de modo que a extração ainda prossiga.
 
-| Variable | Required | Default | Secret | Used by |
+| Variável | Obrigatória | Padrão | Segredo | Usado por |
 |---|---|---|---|---|
-| `OPS_ALERT_COOLDOWN_S` | no | `1800` | no | per-condition alert dedup/cool-down window (seconds) |
-| `OPS_CORE_FAILURE_THRESHOLD` | no | `3` | no | consecutive core failures before a core-down alert |
-| `OPS_AI_FAILURE_THRESHOLD` | no | `3` | no | consecutive AI failures before a repeated-AI-errors alert |
-| `OPS_CATEGORIAS_TTL_S` | no | `300` | no | TTL of the cached supply categories (seconds) |
-| `OPS_HEALTH_POLL_INTERVAL_S` | no | `60` | no | health monitor poll interval (seconds) |
+| `OPS_ALERT_COOLDOWN_S` | não | `1800` | não | janela de dedup/cool-down de alerta por condição (segundos) |
+| `OPS_CORE_FAILURE_THRESHOLD` | não | `3` | não | falhas consecutivas da central antes de um alerta de central-fora |
+| `OPS_AI_FAILURE_THRESHOLD` | não | `3` | não | falhas consecutivas da IA antes de um alerta de erros-repetidos-da-IA |
+| `OPS_CATEGORIAS_TTL_S` | não | `300` | não | TTL das categorias de insumo em cache (segundos) |
+| `OPS_HEALTH_POLL_INTERVAL_S` | não | `60` | não | intervalo de consulta do monitor de saúde (segundos) |
 
-## Item recording retry
+## Retry de registro de item
 
-The `app/retry` package retries purchase items that failed transiently and drives
-the final result message. After confirmation, each item is recorded on its own; a transient
-failure (timeout, 5xx) or a missing/inactive supply (404) is enqueued in the
-Redis sorted set `retry:queue`, scored by its next-attempt time. A single
-background `RetryWorker` polls the set and replays each due item **with the same
-idempotency key** (`nota:{chave}:{insumoId}` or `fluxo:{fluxoId}:{insumoId}`), so
-a replay never duplicates. The backoff is exponential with **full jitter**
-(`base * factor ** (attempt-1)`, capped), and processing is single-flight per
-item (an NX claim on `retry:claim:{member}`), so two workers never resend the
-same item. Everything lives in Redis, so a process kill and restart resumes the
-schedule and records pending items exactly once.
+O pacote `app/retry` repete itens de compra que falharam de forma transitória e conduz
+a mensagem de resultado final. Após a confirmação, cada item é registrado por conta própria; uma falha
+transitória (timeout, 5xx) ou um insumo ausente/inativo (404) é enfileirado no
+sorted set do Redis `retry:queue`, pontuado pelo seu horário de próxima tentativa. Um único
+`RetryWorker` em segundo plano consulta o conjunto e reproduz cada item devido **com a mesma
+chave de idempotência** (`nota:{chave}:{insumoId}` ou `fluxo:{fluxoId}:{insumoId}`), de modo que
+uma reprodução nunca duplique. O backoff é exponencial com **full jitter**
+(`base * factor ** (attempt-1)`, limitado), e o processamento é single-flight por
+item (uma claim NX em `retry:claim:{member}`), de modo que dois workers nunca reenviem o
+mesmo item. Tudo vive no Redis, então um kill e restart do processo retoma a
+agenda e registra os itens pendentes exatamente uma vez.
 
-When an item's attempts are exhausted it goes to the DLQ (`dlq:items`), an
-operational alert is raised, and the item is marked eligible for an on-request
-retry. When the last retryable item of a purchase resolves, the worker sends one
-final result message (success / partial / failure, summary first) and clears the
-conversation. The per-purchase pending counter is decremented in a single
-server-side step, so a crashed or duplicated completion is a no-op and the final
-result message can never be sent twice.
+Quando as tentativas de um item se esgotam, ele vai para a DLQ (`dlq:items`), um
+alerta operacional é disparado, e o item é marcado como elegível para um retry sob
+demanda. Quando o último item retentável de uma compra se resolve, o worker envia uma
+mensagem de resultado final (sucesso / parcial / falha, resumo primeiro) e limpa a
+conversa. O contador de pendências por compra é decrementado em um único passo
+no servidor, de modo que uma conclusão quebrada ou duplicada seja um no-op e a mensagem de
+resultado final nunca possa ser enviada duas vezes.
 
-On-request retry: after a final result with retryable failures, the bot
-offers "tenta de novo". For a configurable window (default 24 h) a
-`TENTAR_NOVAMENTE` intent replays **only** the eligible items — those whose
-automatic retries were exhausted, or that failed because the supply was missing
-or inactive — with the same keys, and reports a fresh result. A new purchase or
-the window's expiry drops the offer.
+Retry sob demanda: após um resultado final com falhas retentáveis, o bot
+oferece "tenta de novo". Por uma janela configurável (padrão 24 h) uma intent
+`TENTAR_NOVAMENTE` reproduz **apenas** os itens elegíveis — aqueles cujos
+retries automáticos se esgotaram, ou que falharam porque o insumo estava ausente
+ou inativo — com as mesmas chaves, e reporta um resultado novo. Uma nova compra ou
+a expiração da janela descarta a oferta.
 
-`main` wires the worker through `create_retry_worker(...)` / a `RetryCoordinator`
-(the recorder's retry sink) and drives its lifecycle with `await worker.start()`
-/ `await worker.stop()`. A `Clock` and a `RandomSource` are injected, so the
-backoff schedule is deterministic in tests.
+O `main` conecta o worker por `create_retry_worker(...)` / um `RetryCoordinator`
+(o sink de retry do recorder) e conduz seu ciclo de vida com `await worker.start()`
+/ `await worker.stop()`. Um `Clock` e um `RandomSource` são injetados, de modo que a
+agenda de backoff seja determinística nos testes.
 
-| Variable | Required | Default | Secret | Used by |
+| Variável | Obrigatória | Padrão | Segredo | Usado por |
 |---|---|---|---|---|
-| `RETRY_POLL_INTERVAL_S` | no | `5` | no | retry queue poll interval (seconds) |
-| `RETRY_BASE_S` | no | `2` | no | backoff base (seconds) |
-| `RETRY_FACTOR` | no | `2` | no | backoff growth factor |
-| `RETRY_CAP_S` | no | `300` | no | backoff ceiling (seconds) |
-| `RETRY_MAX_TENTATIVAS` | no | `6` | no | attempts per item before the DLQ |
-| `RETRY_REQUEST_WINDOW_H` | no | `24` | no | on-request 'try again' window (hours) |
+| `RETRY_POLL_INTERVAL_S` | não | `5` | não | intervalo de consulta da fila de retry (segundos) |
+| `RETRY_BASE_S` | não | `2` | não | base do backoff (segundos) |
+| `RETRY_FACTOR` | não | `2` | não | fator de crescimento do backoff |
+| `RETRY_CAP_S` | não | `300` | não | teto do backoff (segundos) |
+| `RETRY_MAX_TENTATIVAS` | não | `6` | não | tentativas por item antes da DLQ |
+| `RETRY_REQUEST_WINDOW_H` | não | `24` | não | janela de 'tenta de novo' sob demanda (horas) |
 
-## Scripted LLM provider (offline tests)
+## Provedor de LLM scripted (testes offline)
 
-For integration and end-to-end runs without a real key or the network, set
-`LLM_PROVIDER=scripted`. The provider then replays recorded JSON responses
-from the file named by `FAKE_LLM_FIXTURES` (keyed by schema name and request
-text; see `app/llm/scripted.py`). It is never used by the Gemini production
-path.
+Para execuções de integração e ponta a ponta sem uma chave real nem a rede, defina
+`LLM_PROVIDER=scripted`. O provedor então reproduz respostas JSON gravadas
+a partir do arquivo nomeado por `FAKE_LLM_FIXTURES` (indexado por nome de schema e texto
+da requisição; veja `app/llm/scripted.py`). Ele nunca é usado pelo caminho de produção
+do Gemini.
 
-| Variable | Required | Default | Secret | Used by |
+| Variável | Obrigatória | Padrão | Segredo | Usado por |
 |---|---|---|---|---|
-| `LLM_PROVIDER` | no | `gemini` | no | set to `scripted` to replay recorded responses |
-| `FAKE_LLM_FIXTURES` | scripted | — | no | path to the scripted fixtures JSON file |
+| `LLM_PROVIDER` | não | `gemini` | não | defina como `scripted` para reproduzir respostas gravadas |
+| `FAKE_LLM_FIXTURES` | scripted | — | não | caminho para o arquivo JSON de fixtures scripted |
