@@ -16,8 +16,23 @@ async function main(): Promise<void> {
   if (config.baileysEnabled) {
     const forwarder = new WebhookForwarder(config.webhookUrl, config.webhookSecret)
 
+    // Created before onInbound so the handler can read the registry and the
+    // paired account's own JID through it in the opt-in test mode.
+    const baileys = new BaileysWaSocket(
+      config.sessionDir,
+      (raw) => onInbound(raw),
+      (event) => onSession(event),
+      config.mediaMaxBytes,
+      config.discoverGroups,
+      config.acceptOwnMessages,
+    )
+
     const onInbound = async (raw: RawInbound): Promise<void> => {
-      const result = filterInbound(raw, config.grupoJid)
+      const result = filterInbound(raw, config.grupoJid, {
+        acceptOwnMessages: config.acceptOwnMessages,
+        isSelfSent: (id) => baileys.isSelfSent(id),
+        ownJid: baileys.ownJid(),
+      })
       if (!result.allowed) {
         // Dropped before any content touches a log or the webhook.
         logger.info({ reason: result.reason }, 'inbound dropped')
@@ -44,13 +59,9 @@ async function main(): Promise<void> {
     if (config.discoverGroups) {
       logger.warn('DISCOVER_GROUPS=true: group ids and names will be logged; turn it off after copying GRUPO_JID')
     }
-    const baileys = new BaileysWaSocket(
-      config.sessionDir,
-      onInbound,
-      onSession,
-      config.mediaMaxBytes,
-      config.discoverGroups,
-    )
+    if (config.acceptOwnMessages) {
+      logger.warn('ACCEPT_OWN_MESSAGES=true: processing messages from the linked account; for single-number testing only, keep it off in normal operation')
+    }
     await baileys.start()
     socket = baileys
   } else {

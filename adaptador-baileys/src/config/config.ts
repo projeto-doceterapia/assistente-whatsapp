@@ -8,6 +8,7 @@ export interface AdapterConfig {
   webhookSecret: string
   baileysEnabled: boolean
   discoverGroups: boolean
+  acceptOwnMessages: boolean
   mediaTtlMs: number
   mediaMaxBytes: number
 }
@@ -54,6 +55,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AdapterConfig 
     webhookSecret: read('WEBHOOK_SECRET'),
     baileysEnabled,
     discoverGroups: optional(env, 'DISCOVER_GROUPS', 'false').toLowerCase() === 'true',
+    acceptOwnMessages: optional(env, 'ACCEPT_OWN_MESSAGES', 'false').toLowerCase() === 'true',
     mediaTtlMs: Number(optional(env, 'MEDIA_TTL_MS', '120000')),
     mediaMaxBytes: Number(optional(env, 'MEDIA_MAX_BYTES', '8388608')),
   }

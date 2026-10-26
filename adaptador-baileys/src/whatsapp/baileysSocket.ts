@@ -1,6 +1,7 @@
 import makeWASocket, {
   DisconnectReason,
   downloadMediaMessage,
+  generateMessageID,
   useMultiFileAuthState,
   type WAMessage,
   type WASocket as BaileysSocket,
@@ -15,6 +16,7 @@ import {
 import { logger } from '../config/logger.js'
 import { describeGroups } from './groups.js'
 import { decideReconnect } from './reconnect.js'
+import { SentMessageRegistry } from './sentRegistry.js'
 import type {
   HealthState,
   InboundHandler,
@@ -51,6 +53,9 @@ export class BaileysWaSocket implements WaSocket {
   private closed = false
   private groupsListed = false
   private readonly messages = new Map<string, WAMessage>()
+  // Tracks ids of messages this adapter sent, so their fromMe echoes can be
+  // dropped in the opt-in own-message test mode. Unused when the flag is off.
+  private readonly sentRegistry = new SentMessageRegistry()
 
   constructor(
     private readonly sessionDir: string,
@@ -58,6 +63,7 @@ export class BaileysWaSocket implements WaSocket {
     private readonly onSession: SessionHandler,
     private readonly mediaMaxBytes: number,
     private readonly discoverGroups = false,
+    private readonly acceptOwnMessages = false,
   ) {}
 
   async start(): Promise<void> {
@@ -168,7 +174,28 @@ export class BaileysWaSocket implements WaSocket {
     if (this.sock === null) {
       throw new Error('socket not started')
     }
-    await this.sock.sendMessage(to, { text })
+    if (!this.acceptOwnMessages) {
+      // Default path: the send call is byte-for-byte unchanged when the test
+      // mode is off, so normal operation is unaffected.
+      await this.sock.sendMessage(to, { text })
+      return
+    }
+    // Test mode: pre-generate the id and pass it as the messageId option so the
+    // id is recorded before the fromMe echo can arrive, letting the allowlist
+    // tell our own echo apart from a message the tester actually typed.
+    const messageId = generateMessageID()
+    this.sentRegistry.add(messageId)
+    await this.sock.sendMessage(to, { text }, { messageId })
+  }
+
+  isSelfSent(id: string): boolean {
+    return this.sentRegistry.has(id)
+  }
+
+  ownJid(): string | null {
+    // Baileys exposes the paired account's own JID (e.g. 5511...:12@s.whatsapp.net)
+    // once connected; null while unpaired. The device suffix is kept as is.
+    return this.sock?.user?.id ?? null
   }
 
   async downloadMedia(messageId: string): Promise<MediaPayload> {

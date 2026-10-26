@@ -72,6 +72,12 @@ export interface WaSocket {
   downloadMedia(messageId: string): Promise<MediaPayload>
   health(): HealthState
   close(): Promise<void>
+  // True when the id belongs to a message the adapter itself sent. Used only by
+  // the opt-in own-message test mode to drop the adapter's own echoes.
+  isSelfSent(id: string): boolean
+  // The paired account's own JID, or null when unpaired. Used to attribute own
+  // messages (which carry no participant) in the test mode.
+  ownJid(): string | null
 }
 
 export type InboundHandler = (raw: RawInbound) => void | Promise<void>
