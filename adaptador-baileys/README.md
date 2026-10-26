@@ -1,24 +1,25 @@
 # adaptador-baileys
 
-WhatsApp adapter (Node 22 + TypeScript) that keeps the Baileys session, filters
-inbound messages to a single dedicated group, forwards normalized events to the
-orchestrator over an HMAC-signed webhook, and exposes a small HTTP API.
+Adaptador do WhatsApp (Node 22 + TypeScript) que mantém a sessão Baileys, filtra
+as mensagens recebidas para um único grupo dedicado, encaminha eventos
+normalizados ao orquestrador por um webhook assinado com HMAC e expõe uma
+pequena API HTTP.
 
 ## Layout
 
-- `src/config/` — configuration and logger.
-- `src/http/` — Fastify server and HTTP contract.
-- `src/media/` — opaque media reference store.
-- `src/webhook/` — outbound forwarder and HMAC signing.
-- `src/whatsapp/` — Baileys socket, allowlist, reconnect, shared types.
-- `test/` mirrors `src/`; shared test doubles live in `test/support/`.
+- `src/config/` — configuração e logger.
+- `src/http/` — servidor Fastify e contrato HTTP.
+- `src/media/` — armazenamento de referências opacas de mídia.
+- `src/webhook/` — encaminhador de saída e assinatura HMAC.
+- `src/whatsapp/` — socket Baileys, allowlist, reconexão, tipos compartilhados.
+- `test/` espelha `src/`; os dublês de teste compartilhados ficam em `test/support/`.
 
-## Run
+## Execução
 
 ```sh
 npm ci
 npm run build
-npm start        # or: node dist/main.js
+npm start        # ou: node dist/main.js
 npm test         # node:test
 ```
 
@@ -29,60 +30,64 @@ docker build -t adaptador-baileys .
 docker run --rm -e BAILEYS_ENABLED=false -p 8080:8080 adaptador-baileys
 ```
 
-Set `BAILEYS_ENABLED=false` to start the HTTP layer without a WhatsApp
-connection (health reports `degraded`); this is used for image verification.
+Defina `BAILEYS_ENABLED=false` para iniciar a camada HTTP sem uma conexão com o
+WhatsApp (a verificação de saúde reporta `degraded`); isso é usado para verificar
+a imagem.
 
-## Environment variables
+## Variáveis de ambiente
 
-| Variable | Required | Default | Description |
+| Variável | Obrigatória | Padrão | Descrição |
 |---|---|---|---|
-| `GRUPO_JID` | when enabled | — | JID of the dedicated group; only its messages are processed |
-| `ADAPTER_SECRET` | when enabled | — | Shared secret required on inbound HTTP endpoints |
-| `WEBHOOK_URL` | when enabled | — | Orchestrator endpoint events are forwarded to |
-| `WEBHOOK_SECRET` | when enabled | — | HMAC-SHA256 key used to sign forwarded events |
-| `SESSION_DIR` | no | `./session` (`/data/session` in image) | Directory for Baileys session credentials |
-| `BAILEYS_ENABLED` | no | `true` | Set `false` to run without a WhatsApp connection |
-| `MEDIA_TTL_MS` | no | `120000` | Lifetime of opaque media references |
-| `MEDIA_MAX_BYTES` | no | `8388608` | Max media size (bytes); larger downloads are refused with `413` |
-| `DISCOVER_GROUPS` | no | `false` | Set `true` to log the id and name of every group of the linked account once per run, to find the value for `GRUPO_JID` |
-| `PORT` | no | `8080` | HTTP port |
-| `HOST` | no | `0.0.0.0` | HTTP bind address |
-| `LOG_LEVEL` | no | `info` | pino log level |
+| `GRUPO_JID` | quando habilitado | — | JID do grupo dedicado; apenas suas mensagens são processadas |
+| `ADAPTER_SECRET` | quando habilitado | — | Segredo compartilhado exigido nos endpoints HTTP de entrada |
+| `WEBHOOK_URL` | quando habilitado | — | Endpoint do orquestrador para onde os eventos são encaminhados |
+| `WEBHOOK_SECRET` | quando habilitado | — | Chave HMAC-SHA256 usada para assinar os eventos encaminhados |
+| `SESSION_DIR` | não | `./session` (`/data/session` na imagem) | Diretório das credenciais da sessão Baileys |
+| `BAILEYS_ENABLED` | não | `true` | Defina `false` para executar sem uma conexão com o WhatsApp |
+| `MEDIA_TTL_MS` | não | `120000` | Tempo de vida das referências opacas de mídia |
+| `MEDIA_MAX_BYTES` | não | `8388608` | Tamanho máximo de mídia (bytes); downloads maiores são recusados com `413` |
+| `DISCOVER_GROUPS` | não | `false` | Defina `true` para registrar o id e o nome de cada grupo da conta vinculada uma vez por execução, para descobrir o valor de `GRUPO_JID` |
+| `PORT` | não | `8080` | Porta HTTP |
+| `HOST` | não | `0.0.0.0` | Endereço HTTP de bind |
+| `LOG_LEVEL` | não | `info` | Nível de log do pino |
 
-Message content is never logged. Only `image/jpeg`, `image/png` and
-`image/webp` media is downloaded; any other type is refused with `415`.
-Downloads are capped at `MEDIA_MAX_BYTES` and aborted with `413` once exceeded.
-While the session is unpaired the QR string is logged so the operator can
-render it; keep adapter logs private, since they identify the linked chat.
+O conteúdo das mensagens nunca é registrado. Apenas mídias `image/jpeg`,
+`image/png` e `image/webp` são baixadas; qualquer outro tipo é recusado com
+`415`. Os downloads são limitados a `MEDIA_MAX_BYTES` e abortados com `413`
+quando esse limite é excedido. Enquanto a sessão não está pareada, a string do
+QR é registrada para que o operador possa renderizá-la; mantenha os logs do
+adaptador privados, pois eles identificam o chat vinculado.
 
-## Finding the group id
+## Como descobrir o id do grupo
 
-`GRUPO_JID` must be the id of the dedicated group (it ends with `@g.us`). To
-read it, pair the session, then start the adapter once with `DISCOVER_GROUPS=true`.
-After the connection opens it logs a line with the group count, then one line per group of the linked account:
+`GRUPO_JID` deve ser o id do grupo dedicado (termina com `@g.us`). Para lê-lo,
+pareie a sessão e então inicie o adaptador uma vez com `DISCOVER_GROUPS=true`.
+Depois que a conexão abre, ele registra uma linha com a contagem de grupos e, em
+seguida, uma linha por grupo da conta vinculada:
 
 ```
 {"msg":"group discovery: group","jid":"1203...@g.us","subject":"Group name"}
 ```
 
-Copy the `jid` of the dedicated group into `GRUPO_JID`, then remove
-`DISCOVER_GROUPS` (or set it to `false`) and restart. Only the id and the
-subject are logged, never messages or participants. The list is requested once
-per process, because WhatsApp can rate limit repeated calls; leave the setting
-off in normal operation and keep the logs private.
+Copie o `jid` do grupo dedicado para `GRUPO_JID`, depois remova
+`DISCOVER_GROUPS` (ou defina `false`) e reinicie. Apenas o id e o assunto são
+registrados, nunca mensagens ou participantes. A lista é requisitada uma vez por
+processo, porque o WhatsApp pode aplicar rate limit a chamadas repetidas; deixe a
+configuração desligada em operação normal e mantenha os logs privados.
 
-## HTTP contract
+## Contrato HTTP
 
-All endpoints except `GET /health` require the header
+Todos os endpoints, exceto `GET /health`, exigem o cabeçalho
 `X-Adapter-Secret: <ADAPTER_SECRET>`.
 
-| Method | Path | Body / Params | Response |
+| Método | Caminho | Corpo / Parâmetros | Resposta |
 |---|---|---|---|
 | `GET` | `/health` | — | `200 {"status":"connected\|degraded\|down"}` |
-| `POST` | `/messages` | `{ "text": string }` | `202 {"status":"queued"}` (sent to the dedicated group) |
-| `GET` | `/media/{ref}` | opaque `ref` | `200` media stream; `404` if unknown/expired, `413` if over the cap, `415` if not an allowed image |
+| `POST` | `/messages` | `{ "text": string }` | `202 {"status":"queued"}` (enviada ao grupo dedicado) |
+| `GET` | `/media/{ref}` | `ref` opaco | stream de mídia `200`; `404` se desconhecido/expirado, `413` se acima do limite, `415` se não for uma imagem permitida |
 
-Inbound events are sent to `WEBHOOK_URL` as JSON, signed with HMAC-SHA256 in the
-`X-Signature-256: sha256=<hex>` header using `WEBHOOK_SECRET`. Each event is
-either a normalized `message` (id, group/sender JID, kind, text, media ref,
-timestamp) or a `session` event (`connected`, `disconnected`, `logged_out`).
+Os eventos de entrada são enviados para `WEBHOOK_URL` como JSON, assinados com
+HMAC-SHA256 no cabeçalho `X-Signature-256: sha256=<hex>` usando
+`WEBHOOK_SECRET`. Cada evento é ou uma `message` normalizada (id, JID do
+grupo/remetente, kind, texto, referência de mídia, timestamp) ou um evento
+`session` (`connected`, `disconnected`, `logged_out`).
