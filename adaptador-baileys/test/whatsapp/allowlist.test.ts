@@ -48,6 +48,73 @@ test('drops own messages', () => {
   }
 })
 
+const OWN_JID = '5511888:12@s.whatsapp.net'
+
+function ownMode(overrides: Partial<Parameters<typeof filterInbound>[2]> = {}) {
+  return {
+    acceptOwnMessages: true,
+    isSelfSent: () => false,
+    ownJid: OWN_JID,
+    ...overrides,
+  }
+}
+
+test('drops own messages even with the flag off (default options)', () => {
+  const result = filterInbound(raw({ fromMe: true }), GROUP, {
+    acceptOwnMessages: false,
+    isSelfSent: () => false,
+    ownJid: OWN_JID,
+  })
+  assert.equal(result.allowed, false)
+  if (!result.allowed) {
+    assert.equal(result.reason, 'own_message')
+  }
+})
+
+test('accepts an own message not in the registry when the flag is on', () => {
+  const result = filterInbound(raw({ fromMe: true, id: 'typed-1' }), GROUP, ownMode())
+  assert.equal(result.allowed, true)
+  if (result.allowed) {
+    // Attributed to the paired account's own JID, resolved as a phone sender,
+    // and forwarded as fromMe:false so the orchestrator processes it.
+    assert.equal(result.message.senderJid, OWN_JID)
+    assert.equal(result.senderKind, 'phone')
+    assert.equal(result.message.fromMe, false)
+  }
+})
+
+test('drops the adapter own echo when the flag is on', () => {
+  const result = filterInbound(raw({ fromMe: true, id: 'sent-1' }), GROUP, {
+    acceptOwnMessages: true,
+    isSelfSent: (id) => id === 'sent-1',
+    ownJid: OWN_JID,
+  })
+  assert.equal(result.allowed, false)
+  if (!result.allowed) {
+    assert.equal(result.reason, 'own_message')
+  }
+})
+
+test('keeps an own message unknown when the own JID is unavailable', () => {
+  const result = filterInbound(raw({ fromMe: true }), GROUP, ownMode({ ownJid: null }))
+  assert.equal(result.allowed, true)
+  if (result.allowed) {
+    assert.equal(result.senderKind, 'unknown')
+  }
+})
+
+test('drops a non-allowed chat first even when the message is own and the flag is on', () => {
+  const result = filterInbound(
+    raw({ remoteJid: '999@s.whatsapp.net', fromMe: true }),
+    GROUP,
+    ownMode(),
+  )
+  assert.equal(result.allowed, false)
+  if (!result.allowed) {
+    assert.equal(result.reason, 'not_allowed_chat')
+  }
+})
+
 test('drops empty text', () => {
   const result = filterInbound(raw({ text: '   ' }), GROUP)
   assert.equal(result.allowed, false)

@@ -25,6 +25,14 @@ export class FakeWaSocket implements WaSocket {
     return this.state
   }
 
+  isSelfSent(): boolean {
+    return false
+  }
+
+  ownJid(): string | null {
+    return null
+  }
+
   async close(): Promise<void> {
     // nothing to close
   }

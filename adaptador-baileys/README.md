@@ -47,6 +47,7 @@ a imagem.
 | `MEDIA_TTL_MS` | não | `120000` | Tempo de vida das referências opacas de mídia |
 | `MEDIA_MAX_BYTES` | não | `8388608` | Tamanho máximo de mídia (bytes); downloads maiores são recusados com `413` |
 | `DISCOVER_GROUPS` | não | `false` | Defina `true` para registrar o id e o nome de cada grupo da conta vinculada uma vez por execução, para descobrir o valor de `GRUPO_JID` |
+| `ACCEPT_OWN_MESSAGES` | não | `false` | Defina `true` para processar as mensagens enviadas pela própria conta vinculada no grupo dedicado; use apenas para teste com um único número |
 | `PORT` | não | `8080` | Porta HTTP |
 | `HOST` | não | `0.0.0.0` | Endereço HTTP de bind |
 | `LOG_LEVEL` | não | `info` | Nível de log do pino |
@@ -74,6 +75,23 @@ Copie o `jid` do grupo dedicado para `GRUPO_JID`, depois remova
 registrados, nunca mensagens ou participantes. A lista é requisitada uma vez por
 processo, porque o WhatsApp pode aplicar rate limit a chamadas repetidas; deixe a
 configuração desligada em operação normal e mantenha os logs privados.
+
+## Teste com um único número
+
+Por padrão, o adaptador descarta todas as mensagens enviadas pela conta
+vinculada (`fromMe`), para que o assistente nunca processe as próprias
+respostas. Isso impede um cenário comum de teste: um desenvolvedor pareia o
+próprio número e escreve sozinho em um grupo dedicado que contém apenas ele;
+como todas as mensagens são `fromMe`, nada é processado.
+
+Defina `ACCEPT_OWN_MESSAGES=true` para habilitar o modo de teste. Com ele
+ligado, qualquer mensagem digitada pela conta vinculada no grupo dedicado passa
+a ser processada normalmente. Para evitar que o assistente responda a si mesmo
+em loop, o adaptador registra o id de cada mensagem que ele próprio envia e
+continua descartando esses ecos: apenas o que você digita é processado.
+
+Este modo é apenas para teste com um único número; mantenha-o desligado em
+operação normal.
 
 ## Contrato HTTP
 
