@@ -1,2 +1,2 @@
 # assistente-whatsapp
-WhatsApp stock assistant: Python orchestrator and Baileys adapter
+Assistente de estoque no WhatsApp: orquestrador em Python e adaptador Baileys
