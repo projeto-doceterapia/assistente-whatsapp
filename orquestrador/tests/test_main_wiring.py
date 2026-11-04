@@ -31,7 +31,7 @@ def test_build_wiring_closes_partial_resources_on_failure(
     state = _RecordingResource("state", closed)
 
     monkeypatch.setattr(main, "_build_channel", lambda: channel)
-    monkeypatch.setattr(main.httpx, "AsyncClient", lambda **_: http)
+    monkeypatch.setattr(main, "criar_http_core", lambda *_a, **_k: http)
     monkeypatch.setattr(
         main.ConversationState, "from_url", classmethod(lambda cls, *a, **k: state)
     )
@@ -58,7 +58,7 @@ def test_build_wiring_does_not_close_on_success(
     state = _RecordingResource("state", closed)
 
     monkeypatch.setattr(main, "_build_channel", lambda: channel)
-    monkeypatch.setattr(main.httpx, "AsyncClient", lambda **_: http)
+    monkeypatch.setattr(main, "criar_http_core", lambda *_a, **_k: http)
     monkeypatch.setattr(
         main.ConversationState, "from_url", classmethod(lambda cls, *a, **k: state)
     )

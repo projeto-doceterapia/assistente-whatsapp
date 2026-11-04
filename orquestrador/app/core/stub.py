@@ -43,6 +43,8 @@ class CoreStub:
             return httpx.Response(501, json={"detail": "no stub for this route"})
         return handler(request)
 
+    def transport(self) -> httpx.MockTransport:
+        return httpx.MockTransport(self._dispatch)
+
     def client(self) -> httpx.AsyncClient:
-        transport = httpx.MockTransport(self._dispatch)
-        return httpx.AsyncClient(transport=transport, base_url=self.base_url)
+        return httpx.AsyncClient(transport=self.transport(), base_url=self.base_url)

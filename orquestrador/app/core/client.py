@@ -25,6 +25,16 @@ from app.core.models import (
     ObterOuCriarResultado,
 )
 
+HEADER_TOKEN = "X-Orquestrador-Token"
+
+
+def criar_http_core(
+    base_url: str, token: str, transport: httpx.AsyncBaseTransport | None = None
+) -> httpx.AsyncClient:
+    """Build the only HTTP client that talks to the core. The token lives on the
+    client, so a new CoreClient method carries it without any extra work."""
+    return httpx.AsyncClient(base_url=base_url, headers={HEADER_TOKEN: token}, transport=transport)
+
 
 class CoreClient:
     """Async client for the core REST API.

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 def _get(name: str, default: str | None = None) -> str | None:
@@ -52,6 +52,7 @@ class Settings:
     channel: str
     beneficiaria_telefone: str
     core_base_url: str
+    token_core: str = field(repr=False)
     redis_url: str
     conv_ttl_min: int
     max_ajustes: int
@@ -69,6 +70,7 @@ class Settings:
             channel=_get("CHANNEL", "baileys"),
             beneficiaria_telefone=_get_required("BENEFICIARIA_TELEFONE"),
             core_base_url=_get_required("CORE_BASE_URL"),
+            token_core=_get_required("ORQUESTRADOR_TOKEN"),
             redis_url=_get_required("REDIS_URL"),
             conv_ttl_min=_get_int("CONV_TTL_MIN", 30),
             max_ajustes=_get_int("MAX_AJUSTES", 2),
