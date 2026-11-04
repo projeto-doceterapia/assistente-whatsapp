@@ -1,0 +1,24 @@
+{
+  "resumo_inicio_dia": {
+    "data": "16/11/2026",
+    "sinais_pendentes": ["Pedido 42 - Cliente Exemplo"],
+    "pagamentos_finais": [],
+    "entregas_hoje": ["Pedido 40 - Cliente Teste", "Pedido 41"],
+    "pedidos_atrasados": []
+  },
+  "resumo_fim_dia": {
+    "data": "16/11/2026",
+    "pedidos_proximos": ["18/11: Pedido 43 - Cliente Exemplo"],
+    "aguardando_sinal": ["18/11: Pedido 44 - Cliente Teste"],
+    "insumos_comprar": ["Chocolate meio amargo: 0.8 KG (mínimo 2 KG)"]
+  },
+  "estoque_baixo": {
+    "insumo": "Chocolate meio amargo",
+    "saldo": 0.8,
+    "minimo": 2.5
+  },
+  "dia_lotado": {
+    "data": "20/11/2026",
+    "pedidos": 6
+  }
+}
