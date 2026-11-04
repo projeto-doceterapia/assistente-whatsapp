@@ -5,7 +5,7 @@ import pytest
 
 @pytest.fixture
 def base_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("BENEFICIARIA_TELEFONE", "5511999999999")
+    monkeypatch.setenv("BENEFICIARIA_TELEFONE", "5511900000001")
     monkeypatch.setenv("CORE_BASE_URL", "http://core:8080")
     monkeypatch.setenv("ORQUESTRADOR_TOKEN", "token-ficticio-de-teste-0000000000000000")
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")

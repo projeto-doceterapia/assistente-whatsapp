@@ -18,7 +18,7 @@ def test_health_returns_ok() -> None:
 def test_settings_read_from_env(base_env: None) -> None:
     settings = Settings.from_env()
     assert settings.channel == "baileys"
-    assert settings.beneficiaria_telefone == "5511999999999"
+    assert settings.beneficiaria_telefone == "5511900000001"
     assert settings.core_base_url == "http://core:8080"
     assert settings.conv_ttl_min == 30
     assert settings.max_ajustes == 2
