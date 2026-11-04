@@ -48,15 +48,22 @@ docker run --rm -p 8000:8000 --env-file .env orquestrador
 Todas as configurações vêm de variáveis de ambiente. Nenhum valor é embutido na
 imagem. Todos os nomes abaixo são lidos pelo código (`app/config.py`, `app/channels/settings.py`
 e `app/llm/port.py`); a coluna `Segredo` marca as credenciais que nunca devem ser
-registradas em log nem versionadas. Apenas `BENEFICIARIA_TELEFONE`, `CORE_BASE_URL` e
-`REDIS_URL` são obrigatórias para o serviço iniciar; as configurações de canal e de LLM são
-lidas de forma preguiçosa pelos componentes que as usam, então `/health` funciona sem elas.
+registradas em log nem versionadas. Apenas `BENEFICIARIA_TELEFONE`, `CORE_BASE_URL`,
+`ORQUESTRADOR_TOKEN` e `REDIS_URL` são obrigatórias para o serviço iniciar; as configurações
+de canal e de LLM são lidas de forma preguiçosa pelos componentes que as usam, então
+`/health` funciona sem elas.
+
+Sem uma configuração obrigatória, o processo continua de pé e responde só em `/health`: o
+contêiner aparece como saudável, mas não há webhook nem workers. Nesse caso sai um único log
+`WARNING` com o evento `wiring_disabled_missing_setting` e o nome da variável no campo
+`setting` (nunca o valor), o mesmo valendo para as configurações do canal selecionado.
 
 | Variável | Obrigatória | Padrão | Segredo | Usado por |
 |---|---|---|---|---|
 | `CHANNEL` | não | `baileys` | não | seleção de canal (`baileys` ou `cloud_api`) |
 | `BENEFICIARIA_TELEFONE` | sim | — | não | remetente autorizado, E.164 |
 | `CORE_BASE_URL` | sim | — | não | URL base da API central |
+| `ORQUESTRADOR_TOKEN` | sim | — | sim | credencial de serviço enviada como `X-Orquestrador-Token` em toda chamada à API central; não vai para o adaptador nem para a Meta |
 | `REDIS_URL` | sim | — | não | URL de conexão do Redis |
 | `CONV_TTL_MIN` | não | `30` | não | TTL de inatividade da conversa (minutos) |
 | `MAX_AJUSTES` | não | `2` | não | ajustes em texto livre permitidos |
@@ -182,6 +189,14 @@ reporta saúde, ela também é enviada no WhatsApp pelo template `alerta_operaci
 o alerta in-app é criado. Uma chave de cool-down por condição no Redis evita
 tempestades de alerta (padrão 30 min), e os textos dos alertas informam apenas a
 condição, nunca dados de recebimento nem segredos.
+
+Quando a central responde 401 ou 403, o `CoreClient` lança `CoreAuthError`, que não é
+repetido, e registra o log `WARNING` `core_auth_rejected` só com o status e o método. Se isso
+acontece na sonda do `HealthMonitor`, é disparado o alerta `CREDENCIAL_RECUSADA`, e a falha
+não conta para o alerta de central-fora: a central respondeu, o problema é a credencial. Para
+resolver, corrija `ORQUESTRADOR_TOKEN` para o mesmo valor configurado na central e reinicie o
+serviço. Como a cópia in-app também recebe 401 ou 403 nesse estado, esse alerta chega só pelo
+WhatsApp; com o canal fora, sobra apenas o log.
 
 Um `HealthMonitor` em segundo plano consulta a sessão do WhatsApp (`ChannelPort.health()`),
 o Redis (`ping`) e a central, contando falhas consecutivas da central para que um único soluço
