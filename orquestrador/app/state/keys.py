@@ -47,6 +47,10 @@ def dlq_items() -> str:
     return "dlq:items"
 
 
+def paused_replied(sender: str) -> str:
+    return f"paused:replied:{sender}"
+
+
 def notif(notification_id: str) -> str:
     return f"notif:{notification_id}"
 

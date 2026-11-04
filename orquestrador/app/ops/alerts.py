@@ -24,6 +24,7 @@ from app.channel.port import ChannelPort, HealthStatus
 from app.core.client import CoreClient
 from app.core.errors import CoreError
 from app.core.models import NotificacaoRequest, TipoNotificacao
+from app.core.switches import AssistantSwitches
 from app.ops.settings import OpsSettings
 
 logger = logging.getLogger("ops.alerts")
@@ -107,7 +108,9 @@ class OperationalAlerts:
         redis: object,
         recipient: str,
         settings: OpsSettings | None = None,
+        switches: AssistantSwitches | None = None,
     ) -> None:
+        self._switches = switches
         self._core = core
         self._channel = channel
         self._redis = redis

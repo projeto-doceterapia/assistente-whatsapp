@@ -31,6 +31,7 @@ from app.conversation.types import (
     RemindPending,
     SendReadingAck,
 )
+from app.core.switches import AssistantSwitches
 from app.flow.adjustment import AdjustmentStep
 from app.flow.confirmation import ConfirmationStep
 from app.flow.extraction import ExtractionStep, UnsupportedPurchaseError
@@ -39,6 +40,7 @@ from app.flow.messages import cancel_confirmed
 from app.flow.models import ConfirmationOutcome, Draft, FlowDeps
 from app.llm.port import LlmInvalidOutputError, LlmProviderError
 from app.messages import (
+    assistant_paused,
     assistant_unavailable,
     extraction_failed,
     new_purchase_while_pending,
@@ -81,8 +83,10 @@ class InboundHandler:
         retry_coordinator: RetryCoordinator | None = None,
         purchases: PurchaseNotifier | None = None,
         monitor: HealthMonitor | None = None,
+        switches: AssistantSwitches | None = None,
     ) -> None:
         self._deps = deps
+        self._switches = switches
         self._extraction = ExtractionStep(deps)
         self._confirmation = ConfirmationStep(deps)
         self._adjustment = AdjustmentStep(deps)
@@ -112,6 +116,8 @@ class InboundHandler:
             return
         if not await self._deps.state.mark_inbound(message.id):
             return  # already processed (duplicate delivery)
+        if await self._paused(message.sender):
+            return
         if not await self._deps.state.acquire_lock(message.sender):
             await self._reply(message.sender, recording_wait())
             return
@@ -119,6 +125,20 @@ class InboundHandler:
             await self._process(message)
         finally:
             await self._deps.state.release_lock(message.sender)
+
+    async def _paused(self, sender: str) -> bool:
+        """With the assistant off, answer once and stop here: this runs before the
+        lock and before any media download, so nothing is read or stored. No-op
+        when the switches are not wired."""
+        if self._switches is None:
+            return False
+        switches = await self._switches.current()
+        if switches.assistente_ativo:
+            await self._deps.state.clear_paused_replied(sender)
+            return False
+        if await self._deps.state.mark_paused_replied(sender):
+            await self._reply(sender, assistant_paused())
+        return True
 
     async def _process(self, message: InboundMessage) -> None:
         estado, draft = await self._load(message.sender)

@@ -17,6 +17,16 @@ class FakeState:
         self._locks: set[str] = set()
         self._conversations: dict[str, dict[str, object]] = {}
         self._items: dict[str, dict[str, object]] = {}
+        self.paused_replied: set[str] = set()
+
+    async def mark_paused_replied(self, sender: str) -> bool:
+        if sender in self.paused_replied:
+            return False
+        self.paused_replied.add(sender)
+        return True
+
+    async def clear_paused_replied(self, sender: str) -> None:
+        self.paused_replied.discard(sender)
 
     async def mark_inbound(self, message_id: str) -> bool:
         if message_id in self._inbound:

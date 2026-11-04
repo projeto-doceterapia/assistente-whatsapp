@@ -21,6 +21,11 @@ _MARK_NEW = "⚠"
 _MARK_CLARIFY = "❓"
 
 
+def assistant_paused() -> str:
+    """Assistente desligado nas configurações."""
+    return "Assistente pausado. Reative em Configurações."
+
+
 def reading_ack() -> str:
     """Início da leitura."""
     return "Recebi! Estou lendo, um momento…"
