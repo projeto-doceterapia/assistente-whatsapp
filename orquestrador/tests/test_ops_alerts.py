@@ -4,7 +4,7 @@ import pytest
 
 from app.channel.fake import FakeChannel
 from app.channel.port import HealthStatus
-from app.core.client import CoreClient
+from app.core.client import HEADER_TOKEN, CoreClient
 from app.core.models import TipoNotificacao
 from app.core.stub import CoreStub
 from app.ops.alerts import OperationalAlerts
@@ -171,3 +171,28 @@ async def test_alert_message_renders_without_a_doubled_period() -> None:
     assert len(parts) == 1
     assert parts[0].startswith("Alerta operacional: A sessão do WhatsApp")
     assert not parts[0].endswith(".")
+
+
+async def test_credential_alert_message_has_no_secret() -> None:
+    stub = CoreStub()
+    stub.json("POST", NOTIF_PATH, 201, {"idNotificacao": 1})
+    channel = FakeChannel()
+    async with stub.client() as http:
+        alerts = await _alerts(stub, http, channel, FakeRedis())
+        await alerts.raise_core_auth_rejected()
+    mensagem = str(channel.sent_notifications[0].parametros["mensagem"])
+    assert mensagem.startswith("O sistema de estoque recusou a credencial do assistente")
+    assert "até a configuração" in mensagem
+    assert "token-ficticio" not in mensagem
+    assert HEADER_TOKEN not in mensagem
+
+
+async def test_credential_alert_reaches_whatsapp_when_the_in_app_copy_is_refused() -> None:
+    stub = CoreStub()
+    stub.status("POST", NOTIF_PATH, 401)
+    channel = FakeChannel()
+    async with stub.client() as http:
+        alerts = await _alerts(stub, http, channel, FakeRedis())
+        await alerts.raise_core_auth_rejected()
+        await alerts.raise_core_auth_rejected()
+    assert len(channel.sent_notifications) == 1

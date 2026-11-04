@@ -33,3 +33,16 @@ def test_settings_missing_required(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
     with pytest.raises(MissingSettingError):
         Settings.from_env()
+
+
+@pytest.mark.parametrize("valor", [None, "   "])
+def test_settings_missing_token(
+    base_env: None, monkeypatch: pytest.MonkeyPatch, valor: str | None
+) -> None:
+    if valor is None:
+        monkeypatch.delenv("ORQUESTRADOR_TOKEN")
+    else:
+        monkeypatch.setenv("ORQUESTRADOR_TOKEN", valor)
+    with pytest.raises(MissingSettingError) as exc:
+        Settings.from_env()
+    assert exc.value.name == "ORQUESTRADOR_TOKEN"
