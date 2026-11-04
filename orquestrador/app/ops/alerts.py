@@ -4,8 +4,9 @@ An operational problem is surfaced two ways at once:
   1. always as an in-app `ALERTA_OPERACIONAL` notification through the core
      (`POST /notificacoes`), so the owner sees it in the web app even when
      WhatsApp is the failing part;
-  2. also as a WhatsApp message to the owner, but only when the channel reports
-     healthy. When the channel itself is down, no WhatsApp send is attempted.
+  2. also as the `alerta_operacional` WhatsApp template to the owner, but only
+     when the channel reports healthy. When the channel itself is down, no
+     WhatsApp send is attempted.
 
 Every alert carries a dedup/cool-down key in Redis, so a persistent failure
 (polled every minute) does not produce an alert storm: the same key is silent
@@ -28,6 +29,7 @@ from app.ops.settings import OpsSettings
 logger = logging.getLogger("ops.alerts")
 
 _TITULO = "Alerta operacional"
+_TEMPLATE_ALERTA = "alerta_operacional"
 
 
 class AlertKind(str, Enum):
@@ -196,7 +198,14 @@ class OperationalAlerts:
             # Channel not healthy: in-app alert already created, no send attempt.
             return
         try:
-            await self._channel.send_text(self._recipient, f"⚠️ {alert.mensagem}")
+            # A template reaches the owner outside the 24 h window, where free text
+            # is refused. The Cloud API body continues after the parameter, so the
+            # message cannot bring its own final period.
+            await self._channel.send_notification(
+                self._recipient,
+                _TEMPLATE_ALERTA,
+                {"mensagem": alert.mensagem.rstrip(".")},
+            )
         except Exception:
             logger.exception("ops_alert_whatsapp_failed", extra={"kind": alert.kind.value})
 

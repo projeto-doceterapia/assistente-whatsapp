@@ -9,9 +9,10 @@ from app.core.models import TipoNotificacao
 from app.core.stub import CoreStub
 from app.ops.alerts import OperationalAlerts
 from app.ops.settings import OpsSettings
+from app.templates import load_default_renderer
 from tests.fake_redis import FakeRedis
 
-RECIPIENT = "5511999999999"
+RECIPIENT = "5511900000001"
 NOTIF_PATH = "/notificacoes"
 
 
@@ -51,9 +52,12 @@ async def test_session_down_creates_in_app_and_whatsapp_when_healthy() -> None:
         alerts = await _alerts(stub, http, channel, redis)
         await alerts.raise_session_down()
     assert _created_types(stub) == [TipoNotificacao.ALERTA_OPERACIONAL.value]
-    assert len(channel.sent_texts) == 1
+    assert len(channel.sent_notifications) == 1
     # The alert text must not leak secrets or receipt data.
-    assert "sess" in channel.sent_texts[0].text.lower()
+    sent = channel.sent_notifications[0]
+    assert sent.recipient == RECIPIENT
+    assert sent.template_key == "alerta_operacional"
+    assert "sess" in str(sent.parametros["mensagem"]).lower()
 
 
 async def test_channel_down_creates_in_app_without_whatsapp_send() -> None:
@@ -66,7 +70,7 @@ async def test_channel_down_creates_in_app_without_whatsapp_send() -> None:
         alerts = await _alerts(stub, http, channel, redis)
         await alerts.raise_session_down()
     assert _created_types(stub) == [TipoNotificacao.ALERTA_OPERACIONAL.value]
-    assert channel.sent_texts == []  # no WhatsApp send when the channel is down
+    assert channel.sent_notifications == []  # no WhatsApp send when the channel is down
 
 
 async def test_cooldown_suppresses_repeat_within_window() -> None:
@@ -81,7 +85,7 @@ async def test_cooldown_suppresses_repeat_within_window() -> None:
         await alerts.raise_session_down()
     # Only the first one goes out; the cool-down swallows the repeats.
     assert _created_types(stub) == [TipoNotificacao.ALERTA_OPERACIONAL.value]
-    assert len(channel.sent_texts) == 1
+    assert len(channel.sent_notifications) == 1
 
 
 async def test_distinct_kinds_each_alert_once() -> None:
@@ -98,7 +102,7 @@ async def test_distinct_kinds_each_alert_once() -> None:
         await alerts.raise_alert("janela encerrada (id 7)")
     assert len(_created_types(stub)) == 5
     # The missed-notification alert text is id-free (no "7").
-    assert all("7" not in sent.text for sent in channel.sent_texts)
+    assert all("7" not in str(sent.parametros) for sent in channel.sent_notifications)
 
 
 async def test_dlq_items_dedup_per_subject() -> None:
@@ -139,4 +143,31 @@ async def test_in_app_failure_still_tries_whatsapp() -> None:
         alerts = await _alerts(stub, http, channel, redis)
         await alerts.raise_session_down()
     # In-app creation failed, but the WhatsApp copy is still attempted.
-    assert len(channel.sent_texts) == 1
+    assert len(channel.sent_notifications) == 1
+
+
+async def test_alert_uses_the_template_and_never_free_text() -> None:
+    # Free text is refused outside the Cloud API 24 h window.
+    stub = CoreStub()
+    stub.json("POST", NOTIF_PATH, 201, {"idNotificacao": 1})
+    channel = FakeChannel()
+    async with stub.client() as http:
+        alerts = await _alerts(stub, http, channel, FakeRedis())
+        await alerts.raise_core_down()
+    assert channel.sent_texts == []
+    assert [sent.template_key for sent in channel.sent_notifications] == ["alerta_operacional"]
+
+
+async def test_alert_message_renders_without_a_doubled_period() -> None:
+    stub = CoreStub()
+    stub.json("POST", NOTIF_PATH, 201, {"idNotificacao": 1})
+    channel = FakeChannel()
+    async with stub.client() as http:
+        alerts = await _alerts(stub, http, channel, FakeRedis())
+        await alerts.raise_session_down()
+    parts = load_default_renderer().render_parts(
+        "alerta_operacional", channel.sent_notifications[0].parametros
+    )
+    assert len(parts) == 1
+    assert parts[0].startswith("Alerta operacional: A sessão do WhatsApp")
+    assert not parts[0].endswith(".")
