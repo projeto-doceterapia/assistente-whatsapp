@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 from collections.abc import AsyncIterator
 
 import httpx
@@ -55,6 +56,8 @@ from app.retry import (
     create_retry_worker,
 )
 from app.state.store import ConversationState
+
+logger = logging.getLogger("app.main")
 
 
 class HealthResponse(BaseModel):
@@ -144,7 +147,10 @@ def _build_wiring() -> "Wiring | None":
     try:
         settings = Settings.from_env()
         channel = _build_channel()
-    except (MissingSettingError, ChannelSettingsError, LlmConfigError):
+    except (MissingSettingError, ChannelSettingsError) as exc:
+        logger.warning("wiring_disabled_missing_setting", extra={"setting": exc.name})
+        return None
+    except LlmConfigError:
         return None
 
     http = criar_http_core(settings.core_base_url, settings.token_core)
