@@ -116,6 +116,13 @@ ROTAS: dict[str, tuple[str, str, int, object, Call]] = {
         [],
         lambda core: core.listar_categorias(),
     ),
+    "obter_interruptores": (
+        "GET",
+        "/configuracao-notificacao",
+        200,
+        {"avisosAutomaticosAtivo": True, "assistenteAtivo": True},
+        lambda core: core.obter_interruptores(),
+    ),
     "criar_notificacao": (
         "POST",
         "/notificacoes",
