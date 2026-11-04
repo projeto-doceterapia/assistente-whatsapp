@@ -76,7 +76,7 @@ lidas de forma preguiçosa pelos componentes que as usam, então `/health` funci
 | `MEDIA_MAX_BYTES` | não | `8388608` | não | limite rígido do corpo de uma mídia baixada (bytes); o corpo é transmitido em stream e abortado acima desse tamanho |
 | `LLM_PROVIDER` | não | `gemini` | não | seleção do provedor de LLM |
 | `GEMINI_API_KEY` | Gemini | — | sim | chave da API do Gemini |
-| `GEMINI_MODEL` | Gemini | — | não | id do modelo Gemini (ex.: `gemini-2.0-flash`) |
+| `GEMINI_MODEL` | Gemini | — | não | id do modelo Gemini (ex.: `gemini-3.8-flash`) |
 
 ## Canais e templates de notificação
 
@@ -177,7 +177,8 @@ O pacote `app/ops` expõe problemas operacionais e registra compras.
 Todo problema operacional vira uma notificação in-app
 `ALERTA_OPERACIONAL` via `POST /notificacoes`, de modo que a dona a veja
 no app web mesmo quando o WhatsApp é a parte que falha; quando o canal
-reporta saúde, ela também é enviada no WhatsApp, e quando o canal está fora apenas
+reporta saúde, ela também é enviada no WhatsApp pelo template `alerta_operacional`
+(que chega mesmo fora da janela de 24 h), e quando o canal está fora apenas
 o alerta in-app é criado. Uma chave de cool-down por condição no Redis evita
 tempestades de alerta (padrão 30 min), e os textos dos alertas informam apenas a
 condição, nunca dados de recebimento nem segredos.
