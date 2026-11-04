@@ -119,6 +119,14 @@ class CategoriaInsumo(BaseModel):
     descricao: str | None = None
 
 
+class InterruptoresAssistente(BaseModel):
+    """The two switches of GET /configuracao-notificacao; the other settings are
+    ignored. A core that does not send them yet reads as active."""
+
+    avisosAutomaticosAtivo: bool = True
+    assistenteAtivo: bool = True
+
+
 class TipoNotificacao(str, Enum):
     """The notification types the core accepts. The orchestrator
     only creates the two it owns: COMPRA_REGISTRADA (in-app record of a recorded
