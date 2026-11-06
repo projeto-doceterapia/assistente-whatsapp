@@ -36,6 +36,10 @@ _EXPECTED_PARTS: dict[str, list[str]] = {
     ],
     "estoque_baixo": ["Estoque baixo: Chocolate meio amargo está em 0.8 (mínimo 2.5)"],
     "dia_lotado": ["Dia lotado: 20/11/2026 atingiu o limite com 6 pedidos"],
+    "alerta_operacional": [
+        "Alerta operacional: Teste de notificação do Doceterapia: se você recebeu esta "
+        "mensagem, os avisos estão funcionando"
+    ],
 }
 
 

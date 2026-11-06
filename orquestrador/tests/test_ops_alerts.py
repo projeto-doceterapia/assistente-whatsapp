@@ -7,6 +7,7 @@ from app.channel.port import HealthStatus
 from app.core.client import HEADER_TOKEN, CoreClient
 from app.core.models import TipoNotificacao
 from app.core.stub import CoreStub
+from app.core.switches import AssistantSwitches
 from app.ops.alerts import OperationalAlerts
 from app.ops.settings import OpsSettings
 from app.templates import load_default_renderer
@@ -58,6 +59,59 @@ async def test_session_down_creates_in_app_and_whatsapp_when_healthy() -> None:
     assert sent.recipient == RECIPIENT
     assert sent.template_key == "alerta_operacional"
     assert "sess" in str(sent.parametros["mensagem"]).lower()
+
+
+@pytest.mark.parametrize(
+    "corpo",
+    [
+        {"avisosAutomaticosAtivo": False, "assistenteAtivo": True},
+        {"avisosAutomaticosAtivo": True, "assistenteAtivo": False},
+    ],
+)
+async def test_switch_off_skips_whatsapp(corpo: dict[str, bool]) -> None:
+    stub = CoreStub()
+    stub.json("POST", NOTIF_PATH, 201, {"idNotificacao": 1})
+    stub.json("GET", "/configuracao-notificacao", 200, corpo)
+    channel = FakeChannel()
+    channel.set_health(HealthStatus.CONNECTED)
+    async with stub.client() as http:
+        core = CoreClient(http)
+        alerts = OperationalAlerts(
+            core=core,
+            channel=channel,
+            redis=FakeRedis(),
+            recipient=RECIPIENT,
+            settings=OpsSettings(),
+            switches=AssistantSwitches(core),
+        )
+        await alerts.raise_session_down()
+    assert _created_types(stub) == [TipoNotificacao.ALERTA_OPERACIONAL.value]
+    assert channel.sent_notifications == []
+
+
+async def test_switches_on_still_send_whatsapp() -> None:
+    stub = CoreStub()
+    stub.json("POST", NOTIF_PATH, 201, {"idNotificacao": 1})
+    stub.json(
+        "GET",
+        "/configuracao-notificacao",
+        200,
+        {"avisosAutomaticosAtivo": True, "assistenteAtivo": True},
+    )
+    channel = FakeChannel()
+    channel.set_health(HealthStatus.CONNECTED)
+    async with stub.client() as http:
+        core = CoreClient(http)
+        alerts = OperationalAlerts(
+            core=core,
+            channel=channel,
+            redis=FakeRedis(),
+            recipient=RECIPIENT,
+            settings=OpsSettings(),
+            switches=AssistantSwitches(core),
+        )
+        await alerts.raise_session_down()
+    assert len(channel.sent_notifications) == 1
 
 
 async def test_channel_down_creates_in_app_without_whatsapp_send() -> None:

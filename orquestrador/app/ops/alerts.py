@@ -5,8 +5,8 @@ An operational problem is surfaced two ways at once:
      (`POST /notificacoes`), so the owner sees it in the web app even when
      WhatsApp is the failing part;
   2. also as the `alerta_operacional` WhatsApp template to the owner, but only
-     when the channel reports healthy. When the channel itself is down, no
-     WhatsApp send is attempted.
+     when the channel reports healthy and the assistant switches allow notices.
+     When the channel itself is down, no WhatsApp send is attempted.
 
 Every alert carries a dedup/cool-down key in Redis, so a persistent failure
 (polled every minute) does not produce an alert storm: the same key is silent
@@ -24,6 +24,7 @@ from app.channel.port import ChannelPort, HealthStatus
 from app.core.client import CoreClient
 from app.core.errors import CoreError
 from app.core.models import NotificacaoRequest, TipoNotificacao
+from app.core.switches import AssistantSwitches
 from app.ops.settings import OpsSettings
 
 logger = logging.getLogger("ops.alerts")
@@ -107,7 +108,9 @@ class OperationalAlerts:
         redis: object,
         recipient: str,
         settings: OpsSettings | None = None,
+        switches: AssistantSwitches | None = None,
     ) -> None:
+        self._switches = switches
         self._core = core
         self._channel = channel
         self._redis = redis
@@ -165,7 +168,13 @@ class OperationalAlerts:
         if not await self._claim_cooldown(alert):
             return  # still inside the cool-down window: stay silent
         await self._create_in_app(alert)
-        await self._try_whatsapp(alert)
+        if await self._notices_allowed():
+            await self._try_whatsapp(alert)
+
+    async def _notices_allowed(self) -> bool:
+        if self._switches is None:
+            return True
+        return (await self._switches.current()).envia_avisos
 
     async def _claim_cooldown(self, alert: _Alert) -> bool:
         """Reserve the cool-down slot for this alert key. Returns True only for

@@ -68,6 +68,14 @@ class ConversationState:
     async def release_lock(self, sender: str) -> None:
         await self._redis.delete(keys.lock_conv(sender))
 
+    # paused:replied:{sender} — lasts while paused, so the reply goes out once
+    async def mark_paused_replied(self, sender: str) -> bool:
+        stored = await self._redis.set(keys.paused_replied(sender), "1", nx=True)
+        return bool(stored)
+
+    async def clear_paused_replied(self, sender: str) -> None:
+        await self._redis.delete(keys.paused_replied(sender))
+
     # flow:{fluxo_id}:items — per-item recording status
     async def set_item_status(
         self, fluxo_id: str, item_key: str, status: dict[str, object]

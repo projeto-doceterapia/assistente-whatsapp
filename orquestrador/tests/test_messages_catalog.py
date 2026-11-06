@@ -27,6 +27,7 @@ from app.messages import (
     invoice_partial,
     new_purchase_while_pending,
     nothing_pending,
+    assistant_paused,
     reading_ack,
     recording_wait,
     render_confirmation,
@@ -74,6 +75,7 @@ _FAILED_NOT_RETRYABLE = [
 
 # (name, rendered text)
 _CASES = [
+    ("assistant_paused", assistant_paused()),
     ("reading_ack", reading_ack()),
     ("confirmation_three_items", render_confirmation(_THREE_ITEMS)),
     ("confirmation_clarify", render_confirmation(_CLARIFY_ITEMS)),

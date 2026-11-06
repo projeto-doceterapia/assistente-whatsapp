@@ -32,6 +32,7 @@ from app.channels import (
 )
 from app.config import MissingSettingError, Settings
 from app.core.client import CoreClient, criar_http_core
+from app.core.switches import AssistantSwitches
 from app.delivery import DeliveryWorker, create_delivery_worker
 from app.flow.handler import InboundHandler
 from app.flow.intent import LlmClassifier
@@ -176,12 +177,14 @@ def _assemble(
     core = CoreClient(http)
     redis = _redis_of(state)
 
+    switches = AssistantSwitches(core)
     alerts = OperationalAlerts(
         core=core,
         channel=channel,  # type: ignore[arg-type]
         redis=redis,
         recipient=settings.beneficiaria_telefone,
         settings=ops_settings,
+        switches=switches,
     )
 
     coordinator = create_retry_coordinator(
@@ -198,7 +201,7 @@ def _assemble(
     )
 
     handler = _build_handler(
-        settings, channel, core, state, coordinator, purchases, monitor
+        settings, channel, core, state, coordinator, purchases, monitor, switches
     )
 
     delivery = create_delivery_worker(
@@ -269,6 +272,7 @@ def _build_handler(
     coordinator: RetryCoordinator,
     purchases: PurchaseNotifier,
     monitor: HealthMonitor,
+    switches: AssistantSwitches,
 ) -> InboundHandler:
     llm = build_llm_provider()
     categorias = CategoriasProvider(core, ttl_s=_ops_categorias_ttl())
@@ -288,7 +292,7 @@ def _build_handler(
     # handler defers the final message to the worker. The
     # purchase notifier posts the in-app COMPRA_REGISTRADA after recording, and
     # the health monitor receives the AI/core failure counters.
-    return InboundHandler(deps, coordinator, purchases, monitor)
+    return InboundHandler(deps, coordinator, purchases, monitor, switches)
 
 
 def _ops_categorias_ttl() -> int:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.messages.catalog import (
+    assistant_paused,
     final_failure,
     final_failure_retryable,
     final_partial,
@@ -28,6 +29,7 @@ from app.messages.types import (
 )
 
 __all__ = [
+    "assistant_paused",
     "final_failure",
     "final_failure_retryable",
     "final_partial",

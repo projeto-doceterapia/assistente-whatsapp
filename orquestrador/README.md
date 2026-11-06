@@ -178,6 +178,18 @@ quando nenhuma está conectada, o alerta é desabilitado.
 | `DELIVERY_CONFIRM_MAX_TENTATIVAS` | não | `6` | não | tentativas de retry de confirmação por consulta |
 | `DELIVERY_CLAIM_TTL_S` | não | `120` | não | por quanto tempo uma claim de envio sem id de mensagem do canal é tolerada antes de a recuperação tratá-la como 'send outcome unknown' (segundos) |
 
+## Assistente pausado
+
+O orquestrador lê `avisosAutomaticosAtivo` e `assistenteAtivo` de `GET /configuracao-notificacao`,
+só para leitura, e guarda o valor por 30 s. Com a central fora vale o último valor lido; sem
+nenhuma leitura, os dois são considerados ligados.
+
+Com o assistente desligado, a primeira mensagem recebe "Assistente pausado. Reative em
+Configurações." e as seguintes são ignoradas, antes do lock e de qualquer download, inclusive as
+notas fiscais. A chave `paused:replied:{número}` do Redis marca a resposta e é apagada quando chega
+uma mensagem com o assistente ativo. Com qualquer um dos dois desligado, um alerta operacional é
+criado só in-app.
+
 ## Alertas operacionais e registro de compra
 
 O pacote `app/ops` expõe problemas operacionais e registra compras.

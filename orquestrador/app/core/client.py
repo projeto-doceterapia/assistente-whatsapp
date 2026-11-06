@@ -19,6 +19,7 @@ from app.core.models import (
     CatalogoPagina,
     CategoriaInsumo,
     ConfirmacaoEnvioRequest,
+    InterruptoresAssistente,
     MovimentoRequest,
     MovimentoResultado,
     NotaFiscalStatus,
@@ -152,6 +153,13 @@ class CoreClient:
         response = await self._request("GET", "/categorias-insumo")
         self._raise_for_error(response)
         return [CategoriaInsumo.model_validate(item) for item in response.json()]
+
+    async def obter_interruptores(self) -> InterruptoresAssistente:
+        """Read the assistant switches (GET /configuracao-notificacao). The
+        orchestrator only reads these settings."""
+        response = await self._request("GET", "/configuracao-notificacao")
+        self._raise_for_error(response)
+        return InterruptoresAssistente.model_validate(response.json())
 
     async def criar_notificacao(self, request: NotificacaoRequest) -> None:
         """Create an in-app notification (POST /notificacoes). Used for the

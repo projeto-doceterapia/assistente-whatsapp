@@ -20,5 +20,8 @@
   "dia_lotado": {
     "data": "20/11/2026",
     "pedidos": 6
+  },
+  "alerta_operacional": {
+    "mensagem": "Teste de notificação do Doceterapia: se você recebeu esta mensagem, os avisos estão funcionando"
   }
 }
