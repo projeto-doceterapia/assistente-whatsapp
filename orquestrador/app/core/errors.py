@@ -56,3 +56,8 @@ class CoreClientError(CoreError):
 
     def __init__(self, status: int) -> None:
         super().__init__("core client error", status)
+
+
+class CoreAuthError(CoreClientError):
+    """401/403: the core refused the service credential; never retried, since
+    only a configuration change can fix it."""

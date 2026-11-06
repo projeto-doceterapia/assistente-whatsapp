@@ -47,6 +47,7 @@ class AlertKind(str, Enum):
     NOTIFICACAO_NAO_ENVIADA = "notificacao_nao_enviada"
     ERROS_IA = "erros_ia"
     REDIS_FORA = "redis_fora"
+    CREDENCIAL_RECUSADA = "credencial_recusada"
 
 
 # PT-BR messages shown to the owner. They describe the condition only: no
@@ -74,6 +75,10 @@ _MENSAGENS: dict[AlertKind, str] = {
     AlertKind.REDIS_FORA: (
         "O armazenamento temporário do assistente está indisponível. As "
         "conversas em andamento podem ser interrompidas."
+    ),
+    AlertKind.CREDENCIAL_RECUSADA: (
+        "O sistema de estoque recusou a credencial do assistente. Compras e avisos "
+        "pelo WhatsApp ficam parados até a configuração do token ser corrigida."
     ),
 }
 
@@ -140,6 +145,11 @@ class OperationalAlerts:
 
     async def raise_core_down(self) -> None:
         await self._raise(_Alert(AlertKind.CORE_FORA, _MENSAGENS[AlertKind.CORE_FORA]))
+
+    async def raise_core_auth_rejected(self) -> None:
+        await self._raise(
+            _Alert(AlertKind.CREDENCIAL_RECUSADA, _MENSAGENS[AlertKind.CREDENCIAL_RECUSADA])
+        )
 
     async def raise_ai_errors(self) -> None:
         await self._raise(_Alert(AlertKind.ERROS_IA, _MENSAGENS[AlertKind.ERROS_IA]))

@@ -26,6 +26,9 @@ class SpyAlerts:
     async def raise_core_down(self) -> None:
         self.calls.append("core")
 
+    async def raise_core_auth_rejected(self) -> None:
+        self.calls.append("credencial")
+
     async def raise_ai_errors(self) -> None:
         self.calls.append("ai")
 
@@ -115,3 +118,18 @@ async def test_ai_errors_alert_after_threshold() -> None:
         assert alerts.calls.count("ai") == 0
         await monitor.record_ai_error()
     assert alerts.calls.count("ai") == 1
+
+
+@pytest.mark.parametrize("status", [401, 403])
+async def test_core_auth_rejected_raises_credential_alert(status: int) -> None:
+    stub = CoreStub()
+    stub.status("GET", "/categorias-insumo", status)
+    channel = FakeChannel()
+    channel.set_health(HealthStatus.CONNECTED)
+    alerts = SpyAlerts()
+    settings = OpsSettings(core_failure_threshold=1)
+    async with stub.client() as http:
+        monitor = _monitor(alerts, channel, http, OkRedis(), settings)
+        await monitor.poll_once()
+    assert alerts.calls == ["credencial"]
+    assert monitor._core_failures == 0

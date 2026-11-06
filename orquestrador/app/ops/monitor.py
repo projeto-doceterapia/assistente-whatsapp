@@ -7,7 +7,9 @@ raise:
   - the WhatsApp session, via `ChannelPort.health()` (session down);
   - Redis, via `ping()` (Redis down);
   - the core, via a lightweight read, counting consecutive failures so a single
-    blip does not alert (core down after a threshold).
+    blip does not alert (core down after a threshold). A refused credential is
+    a different condition with its own alert: the core answered, so it does not
+    count as down.
 
 AI errors and recording-path core failures are counted through the explicit
 `record_ai_error`/`record_core_failure` methods, so the flow can feed them
@@ -21,7 +23,7 @@ import logging
 
 from app.channel.port import ChannelPort, HealthStatus
 from app.core.client import CoreClient
-from app.core.errors import CoreError
+from app.core.errors import CoreAuthError, CoreError
 from app.ops.alerts import OperationalAlerts
 from app.ops.settings import OpsSettings
 
@@ -114,6 +116,9 @@ class HealthMonitor:
     async def _check_core(self) -> None:
         try:
             await self._core.listar_categorias()
+        except CoreAuthError:
+            await self._alerts.raise_core_auth_rejected()
+            return
         except CoreError:
             await self.record_core_failure()
             return

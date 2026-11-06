@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 import httpx
 
 from app.core.errors import (
+    CoreAuthError,
     CoreClientError,
     CoreConflictError,
     CoreNotFoundError,
@@ -25,13 +27,25 @@ from app.core.models import (
     ObterOuCriarResultado,
 )
 
+logger = logging.getLogger("core.client")
+
+HEADER_TOKEN = "X-Orquestrador-Token"
+
+
+def criar_http_core(
+    base_url: str, token: str, transport: httpx.AsyncBaseTransport | None = None
+) -> httpx.AsyncClient:
+    """Build the only HTTP client that talks to the core. The token lives on the
+    client, so a new CoreClient method carries it without any extra work."""
+    return httpx.AsyncClient(base_url=base_url, headers={HEADER_TOKEN: token}, transport=transport)
+
 
 class CoreClient:
     """Async client for the core REST API.
 
     It is the only orchestrator component that talks to the core. Status codes
     are mapped to modeled outcomes (201 created / 200 duplicate) or to typed
-    errors classified as transient (timeout, 5xx) or definitive (409/422/404).
+    errors classified as transient (timeout, 5xx) or definitive (401/403/404/409/422).
     """
 
     def __init__(self, client: httpx.AsyncClient) -> None:
@@ -51,6 +65,14 @@ class CoreClient:
         status = response.status_code
         if status < 400:
             return
+        if status in (401, 403):
+            # Status and method only: the URL may carry an invoice key and the
+            # request headers carry the token.
+            logger.warning(
+                "core_auth_rejected",
+                extra={"status": status, "method": response.request.method},
+            )
+            raise CoreAuthError(status)
         if status == 404:
             raise CoreNotFoundError()
         if status == 409:

@@ -4,7 +4,10 @@ and the app must fall back to health-only (`_build_wiring` returns None)."""
 
 from __future__ import annotations
 
+import logging
+
 import pytest
+from fastapi.testclient import TestClient
 
 from app import main
 from app.llm.port import LlmConfigError
@@ -31,7 +34,7 @@ def test_build_wiring_closes_partial_resources_on_failure(
     state = _RecordingResource("state", closed)
 
     monkeypatch.setattr(main, "_build_channel", lambda: channel)
-    monkeypatch.setattr(main.httpx, "AsyncClient", lambda **_: http)
+    monkeypatch.setattr(main, "criar_http_core", lambda *_a, **_k: http)
     monkeypatch.setattr(
         main.ConversationState, "from_url", classmethod(lambda cls, *a, **k: state)
     )
@@ -58,7 +61,7 @@ def test_build_wiring_does_not_close_on_success(
     state = _RecordingResource("state", closed)
 
     monkeypatch.setattr(main, "_build_channel", lambda: channel)
-    monkeypatch.setattr(main.httpx, "AsyncClient", lambda **_: http)
+    monkeypatch.setattr(main, "criar_http_core", lambda *_a, **_k: http)
     monkeypatch.setattr(
         main.ConversationState, "from_url", classmethod(lambda cls, *a, **k: state)
     )
@@ -69,3 +72,40 @@ def test_build_wiring_does_not_close_on_success(
 
     assert result is sentinel
     assert closed == []
+
+
+def _wiring_warnings(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    return [
+        record
+        for record in caplog.records
+        if record.getMessage() == "wiring_disabled_missing_setting"
+    ]
+
+
+def test_missing_token_falls_back_to_health_only(
+    base_env: None, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.delenv("ORQUESTRADOR_TOKEN")
+    # configure_logging replaces the root handlers, which would drop caplog's.
+    monkeypatch.setattr(main, "configure_logging", lambda: None)
+    caplog.set_level(logging.WARNING, logger="app.main")
+
+    app = main.create_app()
+
+    assert TestClient(app).get("/health").status_code == 200
+    assert not [route.path for route in app.routes if "webhook" in route.path]
+    registros = _wiring_warnings(caplog)
+    assert len(registros) == 1
+    assert registros[0].levelno == logging.WARNING
+    assert registros[0].setting == "ORQUESTRADOR_TOKEN"
+
+
+def test_missing_channel_setting_is_logged_by_name(
+    base_env: None, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.delenv("ADAPTER_URL", raising=False)
+    caplog.set_level(logging.WARNING, logger="app.main")
+
+    assert main._build_wiring() is None
+
+    assert [record.setting for record in _wiring_warnings(caplog)] == ["ADAPTER_URL"]

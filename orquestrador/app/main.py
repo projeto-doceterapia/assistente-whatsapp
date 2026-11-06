@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 from collections.abc import AsyncIterator
 
 import httpx
@@ -30,7 +31,7 @@ from app.channels import (
     channel_name,
 )
 from app.config import MissingSettingError, Settings
-from app.core.client import CoreClient
+from app.core.client import CoreClient, criar_http_core
 from app.delivery import DeliveryWorker, create_delivery_worker
 from app.flow.handler import InboundHandler
 from app.flow.intent import LlmClassifier
@@ -55,6 +56,8 @@ from app.retry import (
     create_retry_worker,
 )
 from app.state.store import ConversationState
+
+logger = logging.getLogger("app.main")
 
 
 class HealthResponse(BaseModel):
@@ -144,10 +147,13 @@ def _build_wiring() -> "Wiring | None":
     try:
         settings = Settings.from_env()
         channel = _build_channel()
-    except (MissingSettingError, ChannelSettingsError, LlmConfigError):
+    except (MissingSettingError, ChannelSettingsError) as exc:
+        logger.warning("wiring_disabled_missing_setting", extra={"setting": exc.name})
+        return None
+    except LlmConfigError:
         return None
 
-    http = httpx.AsyncClient(base_url=settings.core_base_url)
+    http = criar_http_core(settings.core_base_url, settings.token_core)
     state = ConversationState.from_url(settings.redis_url, settings.conv_ttl_min)
     try:
         return _assemble(settings, channel, http, state)
